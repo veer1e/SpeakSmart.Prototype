@@ -95,6 +95,8 @@ class PracticeController extends ChangeNotifier {
     await tts.speak(systemLine);
   }
 
+  /// Plays the "expected" user line via TTS so the user can hear
+  /// how their upcoming line should sound before recording.
   Future<void> replayExpectedUserLine() async {
     if (!isUserTurn) return;
     await tts.speak(expectedUserLine);
@@ -217,30 +219,17 @@ class PracticeController extends ChangeNotifier {
 
     if (last != null) {
       final gap = now.difference(last).inMilliseconds / 1000.0;
-      final pause = gap - 0.65;
-      if (pause > 0) {
-        totalPauseSeconds += pause;
-        if (pause > longestPauseSeconds) longestPauseSeconds = pause;
+      if (gap > 0.7) {
+        totalPauseSeconds += gap;
+        if (gap > longestPauseSeconds) longestPauseSeconds = gap;
       }
     }
 
-    final t = r.recognizedWords.toLowerCase();
-    fillerCount = _countFillers(t);
-  }
-
-  int _countFillers(String s) {
-    final fillers = ['uh', 'um', 'uhm', 'umm', 'hmm', 'ah', 'er', 'erm'];
-    int count = 0;
-    final tokens = s.replaceAll(RegExp(r'[^a-z ]'), ' ').split(RegExp(r'\s+')).where((e) => e.isNotEmpty);
-    for (final t in tokens) {
-      if (fillers.contains(t)) count++;
+    final w = (r.recognizedWords).toLowerCase();
+    for (final f in const ['um', 'uh', 'erm', 'ah']) {
+      if (w.contains(' $f ') || w.endsWith(' $f') || w.startsWith('$f ')) {
+        fillerCount += 1;
+      }
     }
-    return count;
-  }
-
-  @override
-  void dispose() {
-    _sub?.cancel();
-    super.dispose();
   }
 }
