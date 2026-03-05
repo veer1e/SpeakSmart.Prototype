@@ -269,7 +269,7 @@ class _TurnCard extends StatelessWidget {
                 const Spacer(),
                 if (onReplay != null)
                   IconButton(
-                    tooltip: isSystemTurn ? 'Replay' : 'Hear my line',
+                    tooltip: isSystemTurn ? 'Replay' : 'Hear my expected line again',
                     onPressed: onReplay,
                     icon: const Icon(Icons.replay),
                   ),
