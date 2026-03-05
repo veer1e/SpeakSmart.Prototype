@@ -19,7 +19,8 @@ class PracticeScreen extends StatelessWidget {
     final calib = context.watch<CalibrationController>();
     final env = context.watch<EnvironmentController>();
 
-    final isNoisy = (calib.data != null) && (env.latestMeanDb > calib.data!.noiseOkThresholdDb);
+    final isNoisy =
+        (calib.data != null) && (env.latestMeanDb > calib.data!.noiseOkThresholdDb);
     final current = p.currentTurn;
 
     return Scaffold(
@@ -80,9 +81,7 @@ class PracticeScreen extends StatelessWidget {
                       isSystemTurn: p.isSystemTurn,
                       systemLine: p.systemLine,
                       expectedUserLine: p.expectedUserLine,
-                      onReplay: p.isSystemTurn
-                          ? p.replaySystemLine
-                          : p.replayExpectedUserLine,
+                      onReplay: p.isSystemTurn ? p.replaySystemLine : p.replayExpectedUserLine,
                     )
                   else if (p.isFinished)
                     const _InfoCard(
@@ -102,7 +101,9 @@ class PracticeScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Expanded(child: DbMeter(value: env.latestMeanDb, label: 'Mic level (live)')),
+                          Expanded(
+                            child: DbMeter(value: env.latestMeanDb, label: 'Mic level (live)'),
+                          ),
                           const SizedBox(width: 12),
                           if (isNoisy)
                             Container(
@@ -114,9 +115,12 @@ class PracticeScreen extends StatelessWidget {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.warning_amber_outlined, color: Theme.of(context).colorScheme.error),
+                                  Icon(Icons.warning_amber_outlined,
+                                      color: Theme.of(context).colorScheme.error),
                                   const SizedBox(width: 6),
-                                  Text('Too noisy', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                                  Text('Too noisy',
+                                      style: TextStyle(
+                                          color: Theme.of(context).colorScheme.error)),
                                 ],
                               ),
                             ),
@@ -145,10 +149,13 @@ class PracticeScreen extends StatelessWidget {
                               await p.stopRecording();
                               final result = p.buildScoreForCurrentUserLine();
                               if (context.mounted) {
-                                context.read<EnvironmentController>().recordPractice(result.breakdown.smartSpeakScore);
+                                context
+                                    .read<EnvironmentController>()
+                                    .recordPractice(result.breakdown.smartSpeakScore);
                                 Navigator.pushNamed(context, Routes.feedback, arguments: result);
                               }
-                              await p.commitUserLineAndAdvance(recognizedText: result.recognizedText);
+                              await p.commitUserLineAndAdvance(
+                                  recognizedText: result.recognizedText);
                             } else {
                               await p.startRecording();
                             }
@@ -171,7 +178,8 @@ class PracticeScreen extends StatelessWidget {
                       if (p.partialText.isNotEmpty)
                         Align(
                           alignment: Alignment.centerLeft,
-                          child: Text('Live STT: ${p.partialText}', style: Theme.of(context).textTheme.bodySmall),
+                          child: Text('Live STT: ${p.partialText}',
+                              style: Theme.of(context).textTheme.bodySmall),
                         ),
                     ],
                   ),
@@ -217,7 +225,11 @@ class _ScenarioPicker extends StatelessWidget {
   final ConversationScenario scenario;
   final void Function(ConversationScenario) onChanged;
 
-  const _ScenarioPicker({required this.scenarios, required this.scenario, required this.onChanged});
+  const _ScenarioPicker({
+    required this.scenarios,
+    required this.scenario,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -257,6 +269,12 @@ class _TurnCard extends StatelessWidget {
     final title = isSystemTurn ? 'Partner (TTS)' : 'Your Turn';
     final body = isSystemTurn ? systemLine : expectedUserLine;
 
+    // Clear replay distinction
+    final replayIcon = isSystemTurn ? Icons.play_circle_fill : Icons.record_voice_over;
+    final replayLabel = isSystemTurn ? 'Hear example' : 'Hear my line';
+    final replayTooltip =
+        isSystemTurn ? 'Replay partner line' : 'Preview how your line should sound';
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -268,10 +286,19 @@ class _TurnCard extends StatelessWidget {
                 Text(title, style: Theme.of(context).textTheme.titleMedium),
                 const Spacer(),
                 if (onReplay != null)
-                  IconButton(
-                    tooltip: isSystemTurn ? 'Replay' : 'Hear my expected line again',
-                    onPressed: onReplay,
-                    icon: const Icon(Icons.replay),
+                  Tooltip(
+                    message: replayTooltip,
+                    child: OutlinedButton.icon(
+                      onPressed: onReplay,
+                      icon: Icon(replayIcon),
+                      label: Text(replayLabel),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -280,7 +307,9 @@ class _TurnCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: isSystemTurn ? scheme.surfaceContainerHighest : scheme.primary.withOpacity(0.10),
+                color: isSystemTurn
+                    ? scheme.surfaceContainerHighest
+                    : scheme.primary.withOpacity(0.10),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: scheme.outlineVariant),
               ),
