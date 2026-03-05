@@ -9,7 +9,7 @@ class SmartSpeakApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SmartSpeak',
+      title: 'SpeakSmart',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
       initialRoute: Routes.shell,
