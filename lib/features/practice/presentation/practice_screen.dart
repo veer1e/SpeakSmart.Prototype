@@ -2,16 +2,524 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../app/routes.dart';
+import '../../../core/services/tts_service.dart';
+import '../../../core/widgets/db_meter.dart';
+import '../../../core/widgets/mic_button.dart';
+import '../../../core/widgets/waveform.dart';
 import '../../calibration/controllers/calibration_controller.dart';
 import '../../environment/controllers/environment_controller.dart';
 import '../controllers/practice_controller.dart';
 import '../models/conversation_scenario.dart';
-import '../../../core/widgets/mic_button.dart';
-import '../../../core/widgets/waveform.dart';
-import '../../../core/widgets/db_meter.dart';
 
-class PracticeScreen extends StatelessWidget {
+class PracticeScreen extends StatefulWidget {
   const PracticeScreen({super.key});
+
+  @override
+  State<PracticeScreen> createState() => _PracticeScreenState();
+}
+
+class _PracticeScreenState extends State<PracticeScreen> {
+  bool _started = false;
+
+  // speaking UI state (for showing progress/highlight)
+  bool _isSpeaking = false;
+  String? _speakingText; // which bubble text is currently being spoken
+  Speaker? _speakingSpeaker;
+
+  String? _lastScenarioId;
+  Difficulty? _lastDifficulty;
+
+  void _syncPreviewState(PracticeController p) {
+    final changed = (_lastScenarioId != p.scenario.id) || (_lastDifficulty != p.difficulty);
+    if (changed) {
+      _lastScenarioId = p.scenario.id;
+      _lastDifficulty = p.difficulty;
+      if (_started) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() => _started = false);
+          p.resetConversation();
+        });
+      }
+    }
+  }
+
+  Future<void> _speakWithUi(TtsService tts, {required String text, required Speaker speaker}) async {
+    if (_isSpeaking) return; // prevent double-tap overlaps
+    setState(() {
+      _isSpeaking = true;
+      _speakingText = text;
+      _speakingSpeaker = speaker;
+    });
+
+    try {
+      await tts.speak(text);
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _isSpeaking = false;
+        _speakingText = null;
+        _speakingSpeaker = null;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.watch<PracticeController>();
+    final calib = context.watch<CalibrationController>();
+    final env = context.watch<EnvironmentController>();
+    final tts = context.read<TtsService>();
+
+    _syncPreviewState(p);
+
+    final isNoisy = (calib.data != null) && (env.latestMeanDb > calib.data!.noiseOkThresholdDb);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('SPEAKSMART'),
+        actions: [
+          IconButton(
+            tooltip: 'Restart',
+            onPressed: () {
+              setState(() => _started = false);
+              p.resetConversation();
+            },
+            icon: const Icon(Icons.refresh),
+          ),
+          IconButton(
+            tooltip: 'Menu',
+            icon: const Icon(Icons.menu),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                useSafeArea: true,
+                isScrollControlled: true,
+                showDragHandle: true,
+                builder: (_) => const _PracticeMenuSheet(),
+              );
+            },
+),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Header: Practice + difficulty + scenario
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Practice', style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 10),
+                  _DifficultyPicker(
+                    difficulty: p.difficulty,
+                    onChanged: (d) {
+                      p.setDifficulty(d);
+                      setState(() => _started = false);
+                      p.resetConversation();
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  _ScenarioPicker(
+                    scenarios: p.scenariosFor(p.difficulty),
+                    scenario: p.scenario,
+                    onChanged: (s) {
+                      p.setScenario(s);
+                      setState(() => _started = false);
+                      p.resetConversation();
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            // Main content
+            Expanded(
+              child: !_started
+                  ? _PreviewPane(
+                      scenario: p.scenario,
+                      isSpeaking: _isSpeaking,
+                      speakingText: _speakingText,
+                      speakingSpeaker: _speakingSpeaker,
+                      onPlayLine: (speaker, text) async {
+                        await _speakWithUi(tts, text: text, speaker: speaker);
+                      },
+                    )
+                  : _SessionPane(
+                      isNoisy: isNoisy,
+                      isSpeaking: _isSpeaking,
+                      speakingText: _speakingText,
+                      speakingSpeaker: _speakingSpeaker,
+                      onSpeak: (speaker, text) async {
+                        await _speakWithUi(tts, text: text, speaker: speaker);
+                      },
+                    ),
+            ),
+
+            // Bottom controls
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+              child: !_started
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const _TipToolbox(),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton.icon(
+                            onPressed: _isSpeaking
+                                ? null
+                                : () async {
+                                    setState(() => _started = true);
+
+                                    // Reset to start of conversation
+                                    p.resetConversation();
+
+                                    // Autoplay ONLY once, ONLY after Start.
+                                    // Use UI wrapper so we can show highlight/progress.
+                                    if (p.isSystemTurn) {
+                                      await _speakWithUi(tts, text: p.systemLine, speaker: Speaker.system);
+                                    }
+                                  },
+                            icon: const Icon(Icons.play_arrow_rounded),
+                            label: const Text('START'),
+                          ),
+                        ),
+                      ],
+                    )
+                  : _RecorderCard(isNoisy: isNoisy),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// ============================
+/// PREVIEW (Landing screen)
+/// ============================
+class _PreviewPane extends StatelessWidget {
+  final ConversationScenario scenario;
+
+  final bool isSpeaking;
+  final String? speakingText;
+  final Speaker? speakingSpeaker;
+
+  final Future<void> Function(Speaker speaker, String text) onPlayLine;
+
+  const _PreviewPane({
+    required this.scenario,
+    required this.isSpeaking,
+    required this.speakingText,
+    required this.speakingSpeaker,
+    required this.onPlayLine,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      children: [
+        const SizedBox(height: 4),
+        Text('Preview:', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 10),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              children: [
+                for (int i = 0; i < scenario.turns.length; i++) ...[
+                  _ConversationBubble(
+                    speaker: scenario.turns[i].speaker,
+                    text: scenario.turns[i].text,
+                    isSpeaking: isSpeaking &&
+                        speakingText == scenario.turns[i].text &&
+                        speakingSpeaker == scenario.turns[i].speaker,
+                    onPlay: () => onPlayLine(scenario.turns[i].speaker, scenario.turns[i].text),
+                  ),
+                  if (i != scenario.turns.length - 1) const SizedBox(height: 10),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// ============================
+/// SESSION (After Start)
+/// Now uses the SAME bubble layout as preview.
+/// ============================
+class _SessionPane extends StatelessWidget {
+  final bool isNoisy;
+
+  final bool isSpeaking;
+  final String? speakingText;
+  final Speaker? speakingSpeaker;
+
+  final Future<void> Function(Speaker speaker, String text) onSpeak;
+
+  const _SessionPane({
+    required this.isNoisy,
+    required this.isSpeaking,
+    required this.speakingText,
+    required this.speakingSpeaker,
+    required this.onSpeak,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.watch<PracticeController>();
+    final current = p.currentTurn;
+
+    // Show history + current turn using the same bubble UI as preview
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      children: [
+        if (p.history.isEmpty)
+          const _InfoCard(
+            title: 'Roleplay Conversation',
+            body:
+                'Tap the play button to replay lines. Partner lines are TTS. On your turn, use “Hear my line” to listen before recording.',
+          ),
+
+        // History bubbles (already committed turns)
+        for (final m in p.history) ...[
+          _ConversationBubble(
+            speaker: m.speaker,
+            text: m.text,
+            isSpeaking: isSpeaking && speakingText == m.text && speakingSpeaker == m.speaker,
+            onPlay: () => onSpeak(m.speaker, m.text),
+          ),
+          const SizedBox(height: 10),
+        ],
+
+        // Current turn bubble (highlighted)
+        if (current != null && !p.isFinished) ...[
+          _ConversationBubble(
+            speaker: current.speaker,
+            text: current.text,
+            emphasis: true,
+            isSpeaking: isSpeaking &&
+                speakingText == current.text &&
+                speakingSpeaker == current.speaker,
+            onPlay: () async {
+              // Use controller’s functions for correctness, but route through onSpeak for UI state.
+              if (current.speaker == Speaker.system) {
+                await onSpeak(Speaker.system, p.systemLine);
+              } else {
+                await onSpeak(Speaker.user, p.expectedUserLine);
+              }
+            },
+            playLabel: current.speaker == Speaker.system ? 'Replay Partner' : 'Hear my line',
+            playIcon: current.speaker == Speaker.system
+                ? Icons.replay
+                : Icons.record_voice_over_rounded,
+          ),
+        ] else if (p.isFinished) ...[
+          const _InfoCard(
+            title: 'Conversation Complete',
+            body: 'You finished this scenario. Tap Restart or choose another scenario.',
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Unified bubble used by both Preview and Session so the layout is consistent.
+class _ConversationBubble extends StatelessWidget {
+  final Speaker speaker;
+  final String text;
+  final VoidCallback onPlay;
+
+  final bool emphasis; // used for current-turn highlight
+  final bool isSpeaking;
+
+  final String? playLabel;
+  final IconData? playIcon;
+
+  const _ConversationBubble({
+    required this.speaker,
+    required this.text,
+    required this.onPlay,
+    required this.isSpeaking,
+    this.emphasis = false,
+    this.playLabel,
+    this.playIcon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    final isPartner = speaker == Speaker.system;
+
+    final bubbleColor = isPartner ? scheme.surfaceContainerHighest : scheme.primary;
+    final textColor = isPartner ? scheme.onSurfaceVariant : scheme.onPrimary;
+    final align = isPartner ? Alignment.centerLeft : Alignment.centerRight;
+
+    final iconBg = isPartner ? scheme.surface : scheme.primaryContainer;
+    final iconFg = isPartner ? scheme.onSurfaceVariant : scheme.onPrimaryContainer;
+
+    final borderColor = isSpeaking
+        ? (isPartner ? scheme.primary : scheme.onPrimary)
+        : scheme.outlineVariant;
+
+    final effectivePlayLabel = playLabel ?? (isPartner ? 'Play' : 'Play');
+    final effectivePlayIcon = playIcon ?? Icons.play_arrow_rounded;
+
+    return Align(
+      alignment: align,
+      child: Row(
+        mainAxisAlignment: isPartner ? MainAxisAlignment.start : MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isPartner) ...[
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: iconBg,
+              child: Icon(Icons.support_agent_rounded, size: 16, color: iconFg),
+            ),
+            const SizedBox(width: 10),
+          ],
+
+          Flexible(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: bubbleColor,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: borderColor,
+                  width: isSpeaking ? 2 : 1,
+                ),
+                boxShadow: isSpeaking
+                    ? [
+                        BoxShadow(
+                          blurRadius: 10,
+                          spreadRadius: 0,
+                          color: scheme.primary.withOpacity(0.18),
+                        )
+                      ]
+                    : null,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          text,
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: textColor,
+                                fontWeight: emphasis ? FontWeight.w700 : FontWeight.w400,
+                              ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+
+                      // Compact play button for consistency with preview
+                      InkResponse(
+                        onTap: isSpeaking ? null : onPlay,
+                        radius: 22,
+                        child: Icon(
+                          effectivePlayIcon,
+                          color: textColor,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // speaking indicator
+                  if (isSpeaking) ...[
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(999),
+                      child: LinearProgressIndicator(
+                        minHeight: 3,
+                        backgroundColor: textColor.withOpacity(0.18),
+                      ),
+                    ),
+                  ],
+
+                  // optional small label under bubble (for clarity on session)
+                  if (emphasis) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      effectivePlayLabel,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: textColor.withOpacity(0.9),
+                          ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          if (!isPartner) ...[
+            const SizedBox(width: 10),
+            CircleAvatar(
+              radius: 14,
+              backgroundColor: scheme.secondaryContainer,
+              child: Icon(Icons.person_rounded, size: 16, color: scheme.onSecondaryContainer),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Tip toolbox shown near the Start button (so users always see it).
+class _TipToolbox extends StatelessWidget {
+  const _TipToolbox();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.tips_and_updates_outlined),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Tip', style: Theme.of(context).textTheme.titleSmall),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Use Preview to listen to any line. Tap START to begin; partner will speak once. '
+                    'During your turn, tap “Hear my line” if you need a replay before recording.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecorderCard extends StatelessWidget {
+  final bool isNoisy;
+
+  const _RecorderCard({required this.isNoisy});
 
   @override
   Widget build(BuildContext context) {
@@ -19,173 +527,94 @@ class PracticeScreen extends StatelessWidget {
     final calib = context.watch<CalibrationController>();
     final env = context.watch<EnvironmentController>();
 
-    final isNoisy =
+    final isNoisyComputed =
         (calib.data != null) && (env.latestMeanDb > calib.data!.noiseOkThresholdDb);
-    final current = p.currentTurn;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Practice'),
-        actions: [
-          IconButton(
-            tooltip: 'Calibration',
-            onPressed: () => Navigator.pushNamed(context, Routes.calibration),
-            icon: const Icon(Icons.tune),
-          ),
-          IconButton(
-            tooltip: 'Environment',
-            onPressed: () => Navigator.pushNamed(context, Routes.environment),
-            icon: const Icon(Icons.graphic_eq),
-          ),
-          IconButton(
-            tooltip: 'Restart',
-            onPressed: p.resetConversation,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-      body: SafeArea(
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-              child: Column(
-                children: [
-                  _DifficultyPicker(difficulty: p.difficulty, onChanged: p.setDifficulty),
-                  const SizedBox(height: 10),
-                  _ScenarioPicker(
-                    scenarios: p.scenariosFor(p.difficulty),
-                    scenario: p.scenario,
-                    onChanged: p.setScenario,
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                children: [
-                  if (p.history.isEmpty)
-                    const _InfoCard(
-                      title: 'Roleplay Conversation',
-                      body:
-                          'The app speaks the partner line (TTS). Then it is your turn to speak the highlighted prompt. '
-                          'Your SmartSpeak Score is computed per user turn.',
+            Row(
+              children: [
+                Expanded(child: DbMeter(value: env.latestMeanDb, label: 'Mic level (live)')),
+                const SizedBox(width: 12),
+                if (isNoisyComputed)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(999),
                     ),
-                  for (final m in p.history) ...[
-                    _ChatBubble(speaker: m.speaker, text: m.text),
-                    const SizedBox(height: 8),
-                  ],
-                  if (current != null && !p.isFinished)
-                    _TurnCard(
-                      isSystemTurn: p.isSystemTurn,
-                      systemLine: p.systemLine,
-                      expectedUserLine: p.expectedUserLine,
-                      onReplay: p.isSystemTurn ? p.replaySystemLine : p.replayExpectedUserLine,
-                    )
-                  else if (p.isFinished)
-                    const _InfoCard(
-                      title: 'Conversation Complete',
-                      body: 'You finished this scenario. Tap Restart or choose another scenario.',
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.warning_amber_outlined,
+                            color: Theme.of(context).colorScheme.error),
+                        const SizedBox(width: 6),
+                        Text('Too noisy',
+                            style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                      ],
                     ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: DbMeter(value: env.latestMeanDb, label: 'Mic level (live)'),
-                          ),
-                          const SizedBox(width: 12),
-                          if (isNoisy)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.error.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.warning_amber_outlined,
-                                      color: Theme.of(context).colorScheme.error),
-                                  const SizedBox(width: 6),
-                                  Text('Too noisy',
-                                      style: TextStyle(
-                                          color: Theme.of(context).colorScheme.error)),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Waveform(height: 36),
-                      const SizedBox(height: 12),
-                      MicButton(
-                        isRecording: p.recordState == RecordState.listening,
-                        onPressed: () async {
-                          if (p.isFinished) return;
-
-                          try {
-                            if (p.isSystemTurn) {
-                              // user taps to advance after listening
-                              await p.nextTurn();
-                              return;
-                            }
-
-                            if (!p.isUserTurn) {
-                              throw Exception('Listen to the partner first.');
-                            }
-
-                            if (p.recordState == RecordState.listening) {
-                              await p.stopRecording();
-                              final result = p.buildScoreForCurrentUserLine();
-                              if (context.mounted) {
-                                context
-                                    .read<EnvironmentController>()
-                                    .recordPractice(result.breakdown.smartSpeakScore);
-                                Navigator.pushNamed(context, Routes.feedback, arguments: result);
-                              }
-                              await p.commitUserLineAndAdvance(
-                                  recognizedText: result.recognizedText);
-                            } else {
-                              await p.startRecording();
-                            }
-                          } catch (e) {
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Action error: $e')),
-                              );
-                            }
-                          }
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        _bottomHint(p),
-                        textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                      const SizedBox(height: 8),
-                      if (p.partialText.isNotEmpty)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text('Live STT: ${p.partialText}',
-                              style: Theme.of(context).textTheme.bodySmall),
-                        ),
-                    ],
                   ),
-                ),
-              ),
+              ],
             ),
+            const SizedBox(height: 10),
+            const SizedBox(height: 12),
+            MicButton(
+              isRecording: p.recordState == RecordState.listening,
+              onPressed: () async {
+                if (p.isFinished) return;
+
+                try {
+                  if (p.isSystemTurn) {
+                    await p.nextTurn();
+                    return;
+                  }
+
+                  if (!p.isUserTurn) {
+                    throw Exception('Listen to the partner first.');
+                  }
+
+                  if (p.recordState == RecordState.listening) {
+                    await p.stopRecording();
+                    final result = p.buildScoreForCurrentUserLine();
+
+                    if (context.mounted) {
+                      context.read<EnvironmentController>().recordPractice(result.breakdown.smartSpeakScore);
+                    }
+
+                    if (context.mounted) {
+                      await Navigator.pushNamed(context, Routes.feedback, arguments: result);
+                    }
+                    await p.commitUserLineAndAdvance(recognizedText: result.recognizedText);
+                    await p.replaySystemLine();
+                  } else {
+                    await p.startRecording();
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Action error: $e')),
+                    );
+                  }
+                }
+              },
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _bottomHint(p),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 8),
+            if (p.partialText.isNotEmpty)
+              Align(
+                alignment: Alignment.centerLeft,
+                child:
+                    Text('Live STT: ${p.partialText}', style: Theme.of(context).textTheme.bodySmall),
+              ),
           ],
         ),
       ),
@@ -200,6 +629,9 @@ class PracticeScreen extends StatelessWidget {
   }
 }
 
+/// ============================
+/// Shared UI pieces
+/// ============================
 class _DifficultyPicker extends StatelessWidget {
   final Difficulty difficulty;
   final void Function(Difficulty) onChanged;
@@ -208,14 +640,26 @@ class _DifficultyPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SegmentedButton<Difficulty>(
-      segments: const [
-        ButtonSegment(value: Difficulty.easy, label: Text('Easy')),
-        ButtonSegment(value: Difficulty.medium, label: Text('Medium')),
-        ButtonSegment(value: Difficulty.hard, label: Text('Hard')),
-      ],
-      selected: {difficulty},
-      onSelectionChanged: (s) => onChanged(s.first),
+    Widget label(String text) => SizedBox(
+          width: 84,
+          child: Center(child: Text(text)),
+        );
+
+    return SizedBox(
+      width: double.infinity,
+      child: SegmentedButton<Difficulty>(
+        segments: [
+          ButtonSegment(value: Difficulty.easy, label: label('Easy')),
+          ButtonSegment(value: Difficulty.medium, label: label('Medium')),
+          ButtonSegment(value: Difficulty.hard, label: label('Hard')),
+        ],
+        selected: {difficulty},
+        onSelectionChanged: (s) => onChanged(s.first),
+        style: ButtonStyle(
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+        ),
+      ),
     );
   }
 }
@@ -243,92 +687,10 @@ class _ScenarioPicker extends StatelessWidget {
         for (final s in scenarios) DropdownMenuItem(value: s.id, child: Text(s.title)),
       ],
       onChanged: (id) {
+        if (id == null) return;
         final s = scenarios.firstWhere((x) => x.id == id);
         onChanged(s);
       },
-    );
-  }
-}
-
-class _TurnCard extends StatelessWidget {
-  final bool isSystemTurn;
-  final String systemLine;
-  final String expectedUserLine;
-  final VoidCallback? onReplay;
-
-  const _TurnCard({
-    required this.isSystemTurn,
-    required this.systemLine,
-    required this.expectedUserLine,
-    required this.onReplay,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final title = isSystemTurn ? 'Partner (TTS)' : 'Your Turn';
-    final body = isSystemTurn ? systemLine : expectedUserLine;
-
-    // Clear replay distinction
-    final replayIcon = isSystemTurn ? Icons.play_circle_fill : Icons.record_voice_over;
-    final replayLabel = isSystemTurn ? 'Hear example' : 'Hear my line';
-    final replayTooltip =
-        isSystemTurn ? 'Replay partner line' : 'Preview how your line should sound';
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(title, style: Theme.of(context).textTheme.titleMedium),
-                const Spacer(),
-                if (onReplay != null)
-                  Tooltip(
-                    message: replayTooltip,
-                    child: OutlinedButton.icon(
-                      onPressed: onReplay,
-                      icon: Icon(replayIcon),
-                      label: Text(replayLabel),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: isSystemTurn
-                    ? scheme.surfaceContainerHighest
-                    : scheme.primary.withOpacity(0.10),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: scheme.outlineVariant),
-              ),
-              child: Text(
-                body,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: isSystemTurn ? scheme.onSurfaceVariant : scheme.primary,
-                    ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              isSystemTurn ? 'Listen, then continue.' : 'Speak this line clearly.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -357,33 +719,50 @@ class _InfoCard extends StatelessWidget {
   }
 }
 
-class _ChatBubble extends StatelessWidget {
-  final Speaker speaker;
-  final String text;
-
-  const _ChatBubble({required this.speaker, required this.text});
+class _PracticeMenuSheet extends StatelessWidget {
+  const _PracticeMenuSheet();
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final isSystem = speaker == Speaker.system;
-
-    return Align(
-      alignment: isSystem ? Alignment.centerLeft : Alignment.centerRight,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 320),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: isSystem ? scheme.surfaceContainerHighest : scheme.primary.withOpacity(0.14),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: scheme.outlineVariant),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.person_rounded),
+            title: const Text('Profile'),
+            onTap: () {
+              Navigator.pop(context); // close sheet first
+              Navigator.pushNamed(context, Routes.profile);
+            },
           ),
-          child: Text(
-            text,
-            style: TextStyle(color: isSystem ? scheme.onSurfaceVariant : scheme.primary),
+          ListTile(
+            leading: const Icon(Icons.tune),
+            title: const Text('Calibration'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, Routes.calibration);
+            },
           ),
-        ),
+          ListTile(
+            leading: const Icon(Icons.graphic_eq),
+            title: const Text('Environment'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.pushNamed(context, Routes.environment);
+            },
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.close),
+              label: const Text('Close'),
+            ),
+          ),
+        ],
       ),
     );
   }
