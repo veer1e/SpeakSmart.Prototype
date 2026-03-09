@@ -21,7 +21,6 @@ class _TtsSettingsScreenState extends State<TtsSettingsScreen> {
   @override
   void initState() {
     super.initState();
-    // Provider is available in main.dart via MultiProvider.
     _tts = context.read<TtsService>();
     _rate = _tts.rate;
     _pitch = _tts.pitch;

@@ -19,8 +19,8 @@ class TtsService {
   Future<void> init() async {
     // Load persisted settings (if storage is provided/initialized).
     if (_storage != null) {
-      _rate = _storage!.getTtsRate(fallback: _rate);
-      _pitch = _storage!.getTtsPitch(fallback: _pitch);
+      _rate = _storage.getTtsRate(fallback: _rate);
+      _pitch = _storage.getTtsPitch(fallback: _pitch);
     }
 
     await _tts.setLanguage('en-US');
@@ -41,7 +41,7 @@ class TtsService {
     _rate = value;
     await _tts.setSpeechRate(_rate);
     if (_storage != null) {
-      await _storage!.setTtsRate(_rate);
+      await _storage.setTtsRate(_rate);
     }
   }
 
@@ -49,7 +49,7 @@ class TtsService {
     _pitch = value;
     await _tts.setPitch(_pitch);
     if (_storage != null) {
-      await _storage!.setTtsPitch(_pitch);
+      await _storage.setTtsPitch(_pitch);
     }
   }
 }
