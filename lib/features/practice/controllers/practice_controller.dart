@@ -48,8 +48,6 @@ class PracticeController extends ChangeNotifier {
   PracticeController({required this.storage, required this.stt, required this.tts}) {
     scenario = conversationScenarios.first;
     _resetConversation();
-    // Autoplay first system line
-    _autoPlayIfSystemTurn();
   }
 
   List<ConversationScenario> scenariosFor(Difficulty d) =>
@@ -60,14 +58,12 @@ class PracticeController extends ChangeNotifier {
     scenario = scenariosFor(d).first;
     _resetConversation();
     notifyListeners();
-    _autoPlayIfSystemTurn();
   }
 
   void setScenario(ConversationScenario s) {
     scenario = s;
     _resetConversation();
     notifyListeners();
-    _autoPlayIfSystemTurn();
   }
 
   void _resetConversation() {
@@ -95,8 +91,6 @@ class PracticeController extends ChangeNotifier {
     await tts.speak(systemLine);
   }
 
-  /// Plays the "expected" user line via TTS so the user can hear
-  /// how their upcoming line should sound before recording.
   Future<void> replayExpectedUserLine() async {
     if (!isUserTurn) return;
     await tts.speak(expectedUserLine);
@@ -112,12 +106,19 @@ class PracticeController extends ChangeNotifier {
     finalText = '';
     _resetFluency();
     notifyListeners();
-    await _autoPlayIfSystemTurn();
   }
 
   Future<void> _autoPlayIfSystemTurn() async {
     if (isSystemTurn) {
       await tts.speak(systemLine);
+    }
+  }
+
+  /// Call this from the Start button to begin the conversation exactly once.
+  Future<void> startConversationAutoplayOnce() async {
+    // Only speak if first turn is system and we're at start.
+    if (turnIndex == 0 && history.isEmpty && isSystemTurn) {
+      await _autoPlayIfSystemTurn();
     }
   }
 
@@ -195,14 +196,11 @@ class PracticeController extends ChangeNotifier {
     finalText = '';
     _resetFluency();
     notifyListeners();
-
-    await _autoPlayIfSystemTurn();
   }
 
   void resetConversation() {
     _resetConversation();
     notifyListeners();
-    _autoPlayIfSystemTurn();
   }
 
   void _resetFluency() {
