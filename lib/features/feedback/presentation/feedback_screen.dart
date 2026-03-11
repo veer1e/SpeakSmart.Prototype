@@ -27,24 +27,8 @@ class FeedbackScreen extends StatelessWidget {
                   label: 'SmartSpeak Score',
                 ),
               ),
-              const SizedBox(height: 16),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Expected', style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 6),
-                      Text(result.promptText),
-                      const SizedBox(height: 12),
-                      Text('You said', style: Theme.of(context).textTheme.titleMedium),
-                      const SizedBox(height: 6),
-                      Text(result.recognizedText.isEmpty ? '—' : result.recognizedText),
-                    ],
-                  ),
-                ),
-              ),
+              
+              
               const SizedBox(height: 12),
               Card(
                 child: Padding(
