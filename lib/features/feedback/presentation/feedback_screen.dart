@@ -14,7 +14,18 @@ class FeedbackScreen extends StatelessWidget {
     final b = result.breakdown;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Feedback')),
+      appBar: AppBar(
+        title: const Text('Feedback'),
+        actions: [
+          const SizedBox(width: 8),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.pop(context, 'back_to_practice'),
+            icon: const Icon(Icons.arrow_forward_ios_rounded),
+            label: const Text('Proceed to Practice'),
+          ),
+          const SizedBox(width: 12),
+        ],
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -27,8 +38,6 @@ class FeedbackScreen extends StatelessWidget {
                   label: 'SmartSpeak Score',
                 ),
               ),
-              
-              
               const SizedBox(height: 12),
               Card(
                 child: Padding(
@@ -108,18 +117,21 @@ class FeedbackScreen extends StatelessWidget {
       tips.add('Nice work—try a longer phrase next for a bigger challenge.');
     }
 
-    // Include one actionable pronunciation tip:
     tips.add('Tip: Tap “Listen” before recording and mimic the rhythm and stress.');
 
-    return tips.map((t) => Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('• '),
-          Expanded(child: Text(t)),
-        ],
-      ),
-    )).toList();
+    return tips
+        .map(
+          (t) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('• '),
+                Expanded(child: Text(t)),
+              ],
+            ),
+          ),
+        )
+        .toList();
   }
 }
