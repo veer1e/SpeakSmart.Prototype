@@ -5,11 +5,11 @@ import '../../../app/routes.dart';
 import '../../../core/services/tts_service.dart';
 import '../../../core/widgets/db_meter.dart';
 import '../../../core/widgets/mic_button.dart';
-import '../../../core/widgets/waveform.dart';
 import '../../calibration/controllers/calibration_controller.dart';
 import '../../environment/controllers/environment_controller.dart';
 import '../controllers/practice_controller.dart';
 import '../models/conversation_scenario.dart';
+import '../../../core/widgets/karaoke_text.dart';
 
 class PracticeScreen extends StatefulWidget {
   const PracticeScreen({super.key});
@@ -28,6 +28,27 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
   String? _lastScenarioId;
   Difficulty? _lastDifficulty;
+
+  // ✅ NEW: controller so we can auto-scroll after returning from Feedback
+  final ScrollController _sessionScroll = ScrollController();
+
+  void _scrollToBottom() {
+    if (!_sessionScroll.hasClients) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_sessionScroll.hasClients) return;
+      _sessionScroll.animateTo(
+        _sessionScroll.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _sessionScroll.dispose();
+    super.dispose();
+  }
 
   void _syncPreviewState(PracticeController p) {
     final changed = (_lastScenarioId != p.scenario.id) || (_lastDifficulty != p.difficulty);
@@ -61,6 +82,16 @@ class _PracticeScreenState extends State<PracticeScreen> {
         _speakingText = null;
         _speakingSpeaker = null;
       });
+    }
+  }
+
+  Future<void> _speakCurrentSystemLineIfAny({
+    required PracticeController p,
+    required TtsService tts,
+  }) async {
+    // Only speak AFTER returning to conversation (caller controls when).
+    if (p.isSystemTurn && p.systemLine.isNotEmpty) {
+      await _speakWithUi(tts, text: p.systemLine, speaker: Speaker.system);
     }
   }
 
@@ -99,7 +130,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                 builder: (_) => const _PracticeMenuSheet(),
               );
             },
-),
+          ),
         ],
       ),
       body: SafeArea(
@@ -148,6 +179,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       },
                     )
                   : _SessionPane(
+                      controller: _sessionScroll, // ✅ NEW
                       isNoisy: isNoisy,
                       isSpeaking: _isSpeaking,
                       speakingText: _speakingText,
@@ -179,10 +211,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                                     p.resetConversation();
 
                                     // Autoplay ONLY once, ONLY after Start.
-                                    // Use UI wrapper so we can show highlight/progress.
-                                    if (p.isSystemTurn) {
-                                      await _speakWithUi(tts, text: p.systemLine, speaker: Speaker.system);
-                                    }
+                                    await _speakCurrentSystemLineIfAny(p: p, tts: tts);
                                   },
                             icon: const Icon(Icons.play_arrow_rounded),
                             label: const Text('START'),
@@ -190,7 +219,14 @@ class _PracticeScreenState extends State<PracticeScreen> {
                         ),
                       ],
                     )
-                  : _RecorderCard(isNoisy: isNoisy),
+                  : _RecorderCard(
+                      isNoisy: isNoisy,
+                      isSpeaking: _isSpeaking,
+                      onResumeSystemAfterFeedback: () async {
+                        await _speakCurrentSystemLineIfAny(p: p, tts: tts);
+                      },
+                      onAfterAdvanceScroll: _scrollToBottom, // ✅ NEW
+                    ),
             ),
           ],
         ),
@@ -254,9 +290,9 @@ class _PreviewPane extends StatelessWidget {
 
 /// ============================
 /// SESSION (After Start)
-/// Now uses the SAME bubble layout as preview.
 /// ============================
 class _SessionPane extends StatelessWidget {
+  final ScrollController controller; // ✅ NEW
   final bool isNoisy;
 
   final bool isSpeaking;
@@ -266,6 +302,7 @@ class _SessionPane extends StatelessWidget {
   final Future<void> Function(Speaker speaker, String text) onSpeak;
 
   const _SessionPane({
+    required this.controller, // ✅ NEW
     required this.isNoisy,
     required this.isSpeaking,
     required this.speakingText,
@@ -278,8 +315,8 @@ class _SessionPane extends StatelessWidget {
     final p = context.watch<PracticeController>();
     final current = p.currentTurn;
 
-    // Show history + current turn using the same bubble UI as preview
     return ListView(
+      controller: controller, // ✅ NEW
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       children: [
         if (p.history.isEmpty)
@@ -288,8 +325,6 @@ class _SessionPane extends StatelessWidget {
             body:
                 'Tap the play button to replay lines. Partner lines are TTS. On your turn, use “Hear my line” to listen before recording.',
           ),
-
-        // History bubbles (already committed turns)
         for (final m in p.history) ...[
           _ConversationBubble(
             speaker: m.speaker,
@@ -299,18 +334,14 @@ class _SessionPane extends StatelessWidget {
           ),
           const SizedBox(height: 10),
         ],
-
-        // Current turn bubble (highlighted)
         if (current != null && !p.isFinished) ...[
           _ConversationBubble(
             speaker: current.speaker,
             text: current.text,
             emphasis: true,
-            isSpeaking: isSpeaking &&
-                speakingText == current.text &&
-                speakingSpeaker == current.speaker,
+            isSpeaking:
+                isSpeaking && speakingText == current.text && speakingSpeaker == current.speaker,
             onPlay: () async {
-              // Use controller’s functions for correctness, but route through onSpeak for UI state.
               if (current.speaker == Speaker.system) {
                 await onSpeak(Speaker.system, p.systemLine);
               } else {
@@ -318,9 +349,8 @@ class _SessionPane extends StatelessWidget {
               }
             },
             playLabel: current.speaker == Speaker.system ? 'Replay Partner' : 'Hear my line',
-            playIcon: current.speaker == Speaker.system
-                ? Icons.replay
-                : Icons.record_voice_over_rounded,
+            playIcon:
+                current.speaker == Speaker.system ? Icons.replay : Icons.record_voice_over_rounded,
           ),
         ] else if (p.isFinished) ...[
           const _InfoCard(
@@ -333,13 +363,12 @@ class _SessionPane extends StatelessWidget {
   }
 }
 
-/// Unified bubble used by both Preview and Session so the layout is consistent.
 class _ConversationBubble extends StatelessWidget {
   final Speaker speaker;
   final String text;
   final VoidCallback onPlay;
 
-  final bool emphasis; // used for current-turn highlight
+  final bool emphasis;
   final bool isSpeaking;
 
   final String? playLabel;
@@ -368,11 +397,10 @@ class _ConversationBubble extends StatelessWidget {
     final iconBg = isPartner ? scheme.surface : scheme.primaryContainer;
     final iconFg = isPartner ? scheme.onSurfaceVariant : scheme.onPrimaryContainer;
 
-    final borderColor = isSpeaking
-        ? (isPartner ? scheme.primary : scheme.onPrimary)
-        : scheme.outlineVariant;
+    final borderColor =
+        isSpeaking ? (isPartner ? scheme.primary : scheme.onPrimary) : scheme.outlineVariant;
 
-    final effectivePlayLabel = playLabel ?? (isPartner ? 'Play' : 'Play');
+    final effectivePlayLabel = playLabel ?? 'Play';
     final effectivePlayIcon = playIcon ?? Icons.play_arrow_rounded;
 
     return Align(
@@ -389,7 +417,6 @@ class _ConversationBubble extends StatelessWidget {
             ),
             const SizedBox(width: 10),
           ],
-
           Flexible(
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
@@ -418,29 +445,25 @@ class _ConversationBubble extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Flexible(
-                        child: Text(
-                          text,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        child: KaraokeText(
+                          text: text,
+                          active: isSpeaking,
+                          msPerWord: 320,
+                          highlightOpacity: 0.22,
+                          style: Theme.of(context).textTheme.bodyMedium!.copyWith(
                                 color: textColor,
                                 fontWeight: emphasis ? FontWeight.w700 : FontWeight.w400,
                               ),
                         ),
                       ),
                       const SizedBox(width: 10),
-
-                      // Compact play button for consistency with preview
                       InkResponse(
                         onTap: isSpeaking ? null : onPlay,
                         radius: 22,
-                        child: Icon(
-                          effectivePlayIcon,
-                          color: textColor,
-                        ),
+                        child: Icon(effectivePlayIcon, color: textColor),
                       ),
                     ],
                   ),
-
-                  // speaking indicator
                   if (isSpeaking) ...[
                     const SizedBox(height: 8),
                     ClipRRect(
@@ -451,8 +474,6 @@ class _ConversationBubble extends StatelessWidget {
                       ),
                     ),
                   ],
-
-                  // optional small label under bubble (for clarity on session)
                   if (emphasis) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -466,7 +487,6 @@ class _ConversationBubble extends StatelessWidget {
               ),
             ),
           ),
-
           if (!isPartner) ...[
             const SizedBox(width: 10),
             CircleAvatar(
@@ -481,7 +501,6 @@ class _ConversationBubble extends StatelessWidget {
   }
 }
 
-/// Tip toolbox shown near the Start button (so users always see it).
 class _TipToolbox extends StatelessWidget {
   const _TipToolbox();
 
@@ -518,8 +537,20 @@ class _TipToolbox extends StatelessWidget {
 
 class _RecorderCard extends StatelessWidget {
   final bool isNoisy;
+  final bool isSpeaking;
 
-  const _RecorderCard({required this.isNoisy});
+  /// ✅ Called AFTER user returns from feedback screen.
+  final Future<void> Function() onResumeSystemAfterFeedback;
+
+  /// ✅ NEW: scroll down to show the next/current line
+  final VoidCallback onAfterAdvanceScroll;
+
+  const _RecorderCard({
+    required this.isNoisy,
+    required this.isSpeaking,
+    required this.onResumeSystemAfterFeedback,
+    required this.onAfterAdvanceScroll,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -560,46 +591,12 @@ class _RecorderCard extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 10),
             const SizedBox(height: 12),
             MicButton(
               isRecording: p.recordState == RecordState.listening,
-              onPressed: () async {
-                if (p.isFinished) return;
-
-                try {
-                  if (p.isSystemTurn) {
-                    await p.nextTurn();
-                    return;
-                  }
-
-                  if (!p.isUserTurn) {
-                    throw Exception('Listen to the partner first.');
-                  }
-
-                  if (p.recordState == RecordState.listening) {
-                    await p.stopRecording();
-                    final result = p.buildScoreForCurrentUserLine();
-
-                    if (context.mounted) {
-                      context.read<EnvironmentController>().recordPractice(result.breakdown.smartSpeakScore);
-                    }
-
-                    if (context.mounted) {
-                      await Navigator.pushNamed(context, Routes.feedback, arguments: result);
-                    }
-                    await p.commitUserLineAndAdvance(recognizedText: result.recognizedText);
-                    await p.replaySystemLine();
-                  } else {
-                    await p.startRecording();
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Action error: $e')),
-                    );
-                  }
-                }
+              onPressed: () {
+                if (isSpeaking) return;
+                _handleMicPressed(context, p);
               },
             ),
             const SizedBox(height: 10),
@@ -612,13 +609,60 @@ class _RecorderCard extends StatelessWidget {
             if (p.partialText.isNotEmpty)
               Align(
                 alignment: Alignment.centerLeft,
-                child:
-                    Text('Live STT: ${p.partialText}', style: Theme.of(context).textTheme.bodySmall),
+                child: Text('Live STT: ${p.partialText}',
+                    style: Theme.of(context).textTheme.bodySmall),
               ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _handleMicPressed(BuildContext context, PracticeController p) async {
+    if (p.isFinished) return;
+
+    try {
+      if (p.isSystemTurn) {
+        await p.nextTurn();
+        onAfterAdvanceScroll(); // ✅ keep latest visible
+        return;
+      }
+
+      if (!p.isUserTurn) {
+        throw Exception('Listen to the partner first.');
+      }
+
+      if (p.recordState == RecordState.listening) {
+        await p.stopRecording();
+        final result = p.buildScoreForCurrentUserLine();
+
+        if (context.mounted) {
+          context.read<EnvironmentController>().recordPractice(result.breakdown.smartSpeakScore);
+        }
+
+        if (context.mounted) {
+          await Navigator.pushNamed(context, Routes.feedback, arguments: result);
+        }
+
+        await p.commitUserLineAndAdvance(recognizedText: result.recognizedText);
+
+        // ✅ After returning + advancing, scroll to show the next/current line
+        onAfterAdvanceScroll();
+
+        await onResumeSystemAfterFeedback();
+
+        // ✅ After system line appears, ensure it is visible
+        onAfterAdvanceScroll();
+      } else {
+        await p.startRecording();
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Action error: $e')),
+        );
+      }
+    }
   }
 
   String _bottomHint(PracticeController p) {
@@ -733,7 +777,7 @@ class _PracticeMenuSheet extends StatelessWidget {
             leading: const Icon(Icons.person_rounded),
             title: const Text('Profile'),
             onTap: () {
-              Navigator.pop(context); // close sheet first
+              Navigator.pop(context);
               Navigator.pushNamed(context, Routes.profile);
             },
           ),
