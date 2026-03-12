@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../controllers/environment_controller.dart';
 import '../widgets/environment_badge.dart';
 import '../../../core/widgets/db_meter.dart';
-import '../../../core/widgets/waveform.dart';
 
 class EnvironmentScreen extends StatelessWidget {
   const EnvironmentScreen({super.key});
@@ -39,7 +38,6 @@ class EnvironmentScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       DbMeter(value: env.latestMeanDb, label: 'Live dB'),
                       const SizedBox(height: 16),
-                      const Waveform(height: 48),
                       const SizedBox(height: 12),
                       Text(
                         _messageFor(env.state),
