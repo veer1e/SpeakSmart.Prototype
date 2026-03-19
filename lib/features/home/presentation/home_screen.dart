@@ -19,13 +19,13 @@ class HomeScreen extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Breakpoint for small phones vs wider screens/tablets.
+        
         final isNarrow = constraints.maxWidth < 520;
 
         Widget gap() => const SizedBox(height: _kGap);
         Widget hgap() => const SizedBox(width: _kGap);
 
-        // ----- TOP: Big Challenge Card -----
+        
         final challengeCard = Card(
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
