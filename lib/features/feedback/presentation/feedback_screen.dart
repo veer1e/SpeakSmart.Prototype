@@ -4,25 +4,56 @@ import '../../practice/models/score_result.dart';
 import '../../../core/widgets/score_ring.dart';
 import '../../../core/widgets/word_highlights.dart';
 
-class FeedbackScreen extends StatelessWidget {
+class FeedbackScreen extends StatefulWidget {
   final ScoreResult result;
 
   const FeedbackScreen({super.key, required this.result});
 
   @override
+  State<FeedbackScreen> createState() => _FeedbackScreenState();
+}
+
+class _FeedbackScreenState extends State<FeedbackScreen> {
+  @override
+  void initState() {
+    super.initState();
+
+    // ✅ Auto-advance if perfect score
+    if (widget.result.breakdown.smartSpeakScore == 100) {
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          Navigator.pop(context, 'continue');
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final b = result.breakdown;
+    final b = widget.result.breakdown;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Feedback'),
         actions: [
           const SizedBox(width: 8),
-          OutlinedButton.icon(
-            onPressed: () => Navigator.pop(context, 'back_to_practice'),
-            icon: const Icon(Icons.arrow_forward_ios_rounded),
-            label: const Text('Proceed to Practice'),
+
+          
+          FilledButton.icon(
+            onPressed: () => Navigator.pop(context, 'try_again'),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try Again'),
           ),
+
+          const SizedBox(width: 8),
+
+          
+          OutlinedButton.icon(
+            onPressed: () => Navigator.pop(context, 'continue'),
+            icon: const Icon(Icons.arrow_forward),
+            label: const Text('Continue'),
+          ),
+
           const SizedBox(width: 12),
         ],
       ),
@@ -32,50 +63,89 @@ class FeedbackScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ✅ Show PERFECT message
+              if (b.smartSpeakScore == 100)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.green.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Perfect 🎯',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Colors.green,
+                      ),
+                    ),
+                  ),
+                ),
+
               Center(
                 child: ScoreRing(
                   score: b.smartSpeakScore,
                   label: 'SmartSpeak Score',
                 ),
               ),
+
               const SizedBox(height: 12),
+
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Word-level highlights', style: Theme.of(context).textTheme.titleMedium),
+                      Text('Word-level highlights',
+                          style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 12),
-                      WordHighlights(expectedScores: b.expectedWordScores, spokenWords: b.spokenWords),
+                      WordHighlights(
+                        expectedScores: b.expectedWordScores,
+                        spokenWords: b.spokenWords,
+                      ),
                       const SizedBox(height: 12),
                       const Divider(),
                       const SizedBox(height: 8),
-                      Text('Score breakdown', style: Theme.of(context).textTheme.titleMedium),
+                      Text('Score breakdown',
+                          style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 8),
-                      _line('Correct in order', '${b.matchedInOrder}/${b.expectedCount}'),
+                      _line('Correct in order',
+                          '${b.matchedInOrder}/${b.expectedCount}'),
                       _line('Extra words', '${b.extraCount}'),
-                      _line('Word accuracy', '${(b.wordAccuracy * 100).toStringAsFixed(0)}%'),
+                      _line('Word accuracy',
+                          '${(b.wordAccuracy * 100).toStringAsFixed(0)}%'),
                     ],
                   ),
                 ),
               ),
+
               const SizedBox(height: 12),
+
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Fluency', style: Theme.of(context).textTheme.titleMedium),
+                      Text('Fluency',
+                          style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 8),
-                      _line('Filler words', '${result.fluency.fillerCount}'),
-                      _line('Total pause time', '${result.fluency.totalPauseSeconds.toStringAsFixed(1)}s'),
-                      _line('Longest pause', '${result.fluency.longestPauseSeconds.toStringAsFixed(1)}s'),
+                      _line('Filler words',
+                          '${widget.result.fluency.fillerCount}'),
+                      _line(
+                          'Total pause time',
+                          '${widget.result.fluency.totalPauseSeconds.toStringAsFixed(1)}s'),
+                      _line(
+                          'Longest pause',
+                          '${widget.result.fluency.longestPauseSeconds.toStringAsFixed(1)}s'),
                       const SizedBox(height: 12),
-                      Text('Tips', style: Theme.of(context).textTheme.titleMedium),
+                      Text('Tips',
+                          style: Theme.of(context).textTheme.titleMedium),
                       const SizedBox(height: 8),
-                      ..._tips(result),
+                      ..._tips(widget.result),
                     ],
                   ),
                 ),
@@ -101,23 +171,29 @@ class FeedbackScreen extends StatelessWidget {
 
   List<Widget> _tips(ScoreResult r) {
     final tips = <String>[];
+
     if (r.fluency.fillerCount > 0) {
-      tips.add('Try to pause silently instead of using filler words (e.g., “uh”, “um”).');
+      tips.add(
+          'Try to pause silently instead of using filler words (e.g., “uh”, “um”).');
     }
     if (r.fluency.longestPauseSeconds > 1.0) {
       tips.add('Practice speaking in short chunks to reduce long pauses.');
     }
     if (r.breakdown.extraCount > 0) {
-      tips.add('Focus on the expected words only—avoid adding extra words.');
+      tips.add(
+          'Focus on the expected words only—avoid adding extra words.');
     }
     if (r.breakdown.wordAccuracy < 0.85) {
-      tips.add('Slow down slightly and repeat the difficult words clearly.');
+      tips.add(
+          'Slow down slightly and repeat the difficult words clearly.');
     }
     if (tips.isEmpty) {
-      tips.add('Nice work—try a longer phrase next for a bigger challenge.');
+      tips.add(
+          'Nice work—try a longer phrase next for a bigger challenge.');
     }
 
-    tips.add('Tip: Tap “Listen” before recording and mimic the rhythm and stress.');
+    tips.add(
+        'Tip: Tap “Listen” before recording and mimic the rhythm and stress.');
 
     return tips
         .map(

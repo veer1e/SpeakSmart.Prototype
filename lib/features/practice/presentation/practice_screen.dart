@@ -615,51 +615,66 @@ class _RecorderCard extends StatelessWidget {
   }
 
   Future<void> _handleMicPressed(BuildContext context, PracticeController p) async {
-    if (p.isFinished) return;
+  if (p.isFinished) return;
 
-    try {
-      if (p.isSystemTurn) {
-        await p.nextTurn();
-        onAfterAdvanceScroll(); 
+  try {
+    if (p.isSystemTurn) {
+      await p.nextTurn();
+      onAfterAdvanceScroll();
+      return;
+    }
+
+    if (!p.isUserTurn) {
+      throw Exception('Listen to the partner first.');
+    }
+
+    if (p.recordState == RecordState.listening) {
+      await p.stopRecording();
+
+      final result = p.buildScoreForCurrentUserLine();
+      final score = result.breakdown.smartSpeakScore;
+
+      if (context.mounted) {
+        context.read<EnvironmentController>().recordPractice(score);
+      }
+
+      
+      bool shouldAdvance = true;
+
+      if (score < 100 && context.mounted) {
+        shouldAdvance = await _showRetryDialog(context, score);
+      }
+
+      if (!shouldAdvance) {
+        
         return;
       }
+     
 
-      if (!p.isUserTurn) {
-        throw Exception('Listen to the partner first.');
-      }
-
-      if (p.recordState == RecordState.listening) {
-        await p.stopRecording();
-        final result = p.buildScoreForCurrentUserLine();
-
-        if (context.mounted) {
-          context.read<EnvironmentController>().recordPractice(result.breakdown.smartSpeakScore);
-        }
-
-        if (context.mounted) {
-          await Navigator.pushNamed(context, Routes.feedback, arguments: result);
-        }
-
-        await p.commitUserLineAndAdvance(recognizedText: result.recognizedText);
-
-        
-        onAfterAdvanceScroll();
-
-        await onResumeSystemAfterFeedback();
-
-        
-        onAfterAdvanceScroll();
-      } else {
-        await p.startRecording();
-      }
-    } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Action error: $e')),
-        );
+        await Navigator.pushNamed(context, Routes.feedback, arguments: result);
       }
+
+      await p.commitUserLineAndAdvance(
+        recognizedText: result.recognizedText,
+      );
+
+      onAfterAdvanceScroll();
+
+      await onResumeSystemAfterFeedback();
+
+      onAfterAdvanceScroll();
+    } else {
+      await p.startRecording();
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Action error: $e')),
+      );
     }
   }
+}
 
   String _bottomHint(PracticeController p) {
     if (p.isFinished) return 'Conversation complete.';
@@ -667,6 +682,32 @@ class _RecorderCard extends StatelessWidget {
     if (p.recordState == RecordState.listening) return 'Listening… speak your line now.';
     return 'Your turn. Tap the mic and say the prompt exactly.';
   }
+  Future<bool> _showRetryDialog(BuildContext context, int score) async {
+  final result = await showDialog<bool>(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) {
+      return AlertDialog(
+        title: const Text('Almost there 👀'),
+        content: Text(
+          'You scored $score.\n\nDo you want to retry this line or continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Retry'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Continue'),
+          ),
+        ],
+      );
+    },
+  );
+
+  return result ?? false;
+}
 }
 
 
