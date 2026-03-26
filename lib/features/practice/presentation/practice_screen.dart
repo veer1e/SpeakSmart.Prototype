@@ -21,15 +21,15 @@ class PracticeScreen extends StatefulWidget {
 class _PracticeScreenState extends State<PracticeScreen> {
   bool _started = false;
 
-  // speaking UI state (for showing progress/highlight)
+  
   bool _isSpeaking = false;
-  String? _speakingText; // which bubble text is currently being spoken
+  String? _speakingText; 
   Speaker? _speakingSpeaker;
 
   String? _lastScenarioId;
   Difficulty? _lastDifficulty;
 
-  // ✅ NEW: controller so we can auto-scroll after returning from Feedback
+  
   final ScrollController _sessionScroll = ScrollController();
 
   void _scrollToBottom() {
@@ -66,7 +66,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   }
 
   Future<void> _speakWithUi(TtsService tts, {required String text, required Speaker speaker}) async {
-    if (_isSpeaking) return; // prevent double-tap overlaps
+    if (_isSpeaking) return; 
     setState(() {
       _isSpeaking = true;
       _speakingText = text;
@@ -89,7 +89,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
     required PracticeController p,
     required TtsService tts,
   }) async {
-    // Only speak AFTER returning to conversation (caller controls when).
+    
     if (p.isSystemTurn && p.systemLine.isNotEmpty) {
       await _speakWithUi(tts, text: p.systemLine, speaker: Speaker.system);
     }
@@ -136,7 +136,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Header: Practice + difficulty + scenario
+            
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: Column(
@@ -166,7 +166,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
               ),
             ),
 
-            // Main content
+            
             Expanded(
               child: !_started
                   ? _PreviewPane(
@@ -179,7 +179,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       },
                     )
                   : _SessionPane(
-                      controller: _sessionScroll, // ✅ NEW
+                      controller: _sessionScroll, 
                       isNoisy: isNoisy,
                       isSpeaking: _isSpeaking,
                       speakingText: _speakingText,
@@ -190,7 +190,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                     ),
             ),
 
-            // Bottom controls
+            
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
               child: !_started
@@ -207,10 +207,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
                                 : () async {
                                     setState(() => _started = true);
 
-                                    // Reset to start of conversation
+                                    
                                     p.resetConversation();
 
-                                    // Autoplay ONLY once, ONLY after Start.
+                                    
                                     await _speakCurrentSystemLineIfAny(p: p, tts: tts);
                                   },
                             icon: const Icon(Icons.play_arrow_rounded),
@@ -225,7 +225,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                       onResumeSystemAfterFeedback: () async {
                         await _speakCurrentSystemLineIfAny(p: p, tts: tts);
                       },
-                      onAfterAdvanceScroll: _scrollToBottom, // ✅ NEW
+                      onAfterAdvanceScroll: _scrollToBottom, 
                     ),
             ),
           ],
@@ -235,9 +235,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   }
 }
 
-/// ============================
-/// PREVIEW (Landing screen)
-/// ============================
+
 class _PreviewPane extends StatelessWidget {
   final ConversationScenario scenario;
 
@@ -288,11 +286,9 @@ class _PreviewPane extends StatelessWidget {
   }
 }
 
-/// ============================
-/// SESSION (After Start)
-/// ============================
+
 class _SessionPane extends StatelessWidget {
-  final ScrollController controller; // ✅ NEW
+  final ScrollController controller; 
   final bool isNoisy;
 
   final bool isSpeaking;
@@ -302,7 +298,7 @@ class _SessionPane extends StatelessWidget {
   final Future<void> Function(Speaker speaker, String text) onSpeak;
 
   const _SessionPane({
-    required this.controller, // ✅ NEW
+    required this.controller, 
     required this.isNoisy,
     required this.isSpeaking,
     required this.speakingText,
@@ -316,7 +312,7 @@ class _SessionPane extends StatelessWidget {
     final current = p.currentTurn;
 
     return ListView(
-      controller: controller, // ✅ NEW
+      controller: controller, 
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       children: [
         if (p.history.isEmpty)
@@ -539,10 +535,10 @@ class _RecorderCard extends StatelessWidget {
   final bool isNoisy;
   final bool isSpeaking;
 
-  /// ✅ Called AFTER user returns from feedback screen.
+ 
   final Future<void> Function() onResumeSystemAfterFeedback;
 
-  /// ✅ NEW: scroll down to show the next/current line
+  
   final VoidCallback onAfterAdvanceScroll;
 
   const _RecorderCard({
@@ -624,7 +620,7 @@ class _RecorderCard extends StatelessWidget {
     try {
       if (p.isSystemTurn) {
         await p.nextTurn();
-        onAfterAdvanceScroll(); // ✅ keep latest visible
+        onAfterAdvanceScroll(); 
         return;
       }
 
@@ -646,12 +642,12 @@ class _RecorderCard extends StatelessWidget {
 
         await p.commitUserLineAndAdvance(recognizedText: result.recognizedText);
 
-        // ✅ After returning + advancing, scroll to show the next/current line
+        
         onAfterAdvanceScroll();
 
         await onResumeSystemAfterFeedback();
 
-        // ✅ After system line appears, ensure it is visible
+        
         onAfterAdvanceScroll();
       } else {
         await p.startRecording();
@@ -673,9 +669,7 @@ class _RecorderCard extends StatelessWidget {
   }
 }
 
-/// ============================
-/// Shared UI pieces
-/// ============================
+
 class _DifficultyPicker extends StatelessWidget {
   final Difficulty difficulty;
   final void Function(Difficulty) onChanged;

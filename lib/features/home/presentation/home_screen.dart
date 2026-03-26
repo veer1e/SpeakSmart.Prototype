@@ -71,7 +71,7 @@ class HomeScreen extends StatelessWidget {
           ),
         );
 
-        // ----- Environment Card -----
+
         final environmentCard = Card(
           child: Padding(
             padding: const EdgeInsets.all(14),
@@ -88,7 +88,7 @@ class HomeScreen extends StatelessWidget {
           ),
         );
 
-        // ----- Calibration Card -----
+
         final calibrationCard = Card(
           child: Padding(
             padding: const EdgeInsets.all(14),
@@ -104,7 +104,7 @@ class HomeScreen extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 12),
-                // Wrap keeps buttons nice on narrow phones (no overflow).
+                
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
@@ -126,18 +126,18 @@ class HomeScreen extends StatelessWidget {
           ),
         );
 
-        // ----- Mini Calendar -----
+
         final calendarCard = Card(
           child: Padding(
             padding: const EdgeInsets.all(14),
             child: _MiniCalendar(
               month: DateTime.now(),
-              highlightDays: const {}, // keep simple for now
+              highlightDays: const {}, 
             ),
           ),
         );
 
-        // ----- Daily Progress -----
+        
         final progressCard = Card(
           child: Padding(
             padding: const EdgeInsets.all(14),
@@ -187,7 +187,7 @@ class HomeScreen extends StatelessWidget {
           ),
         );
 
-        // ----- Responsive sections -----
+        
         final envCalibSection = isNarrow
             ? Column(
                 children: [
@@ -230,15 +230,15 @@ class HomeScreen extends StatelessWidget {
               Text('SpeakSmart', style: Theme.of(context).textTheme.headlineSmall),
               gap(),
 
-              // Big mic card
+              
               challengeCard,
               gap(),
 
-              // Environment + Calibration
+              
               envCalibSection,
               gap(),
 
-              // Calendar + Daily Progress
+              
               calendarProgressSection,
             ],
           ),
@@ -248,11 +248,10 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// Simple “mini calendar” without external packages.
-/// (Shows current month grid + highlights today.)
+
 class _MiniCalendar extends StatelessWidget {
   final DateTime month;
-  final Set<int> highlightDays; // day numbers to highlight (optional)
+  final Set<int> highlightDays; 
 
   const _MiniCalendar({
     required this.month,
@@ -265,7 +264,7 @@ class _MiniCalendar extends StatelessWidget {
 
     final first = DateTime(month.year, month.month, 1);
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
-    final weekdayOffset = (first.weekday % 7); // Sun=0, Mon=1 ... Sat=6
+    final weekdayOffset = (first.weekday % 7); 
     final today = DateTime.now();
     final isSameMonth = (today.year == month.year && today.month == month.month);
 
@@ -274,7 +273,7 @@ class _MiniCalendar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Header (month + year)
+        
         Row(
           children: [
             Text(
@@ -292,7 +291,7 @@ class _MiniCalendar extends StatelessWidget {
         ),
         const SizedBox(height: 10),
 
-        // Weekday row
+        
         Row(
           children: [
             for (final l in labels)
@@ -311,7 +310,7 @@ class _MiniCalendar extends StatelessWidget {
         ),
         const SizedBox(height: 8),
 
-        // Calendar grid
+        
         GridView.count(
           crossAxisCount: 7,
           shrinkWrap: true,

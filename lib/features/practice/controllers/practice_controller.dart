@@ -30,7 +30,7 @@ class PracticeController extends ChangeNotifier {
   Difficulty difficulty = Difficulty.easy;
   late ConversationScenario scenario;
 
-  int turnIndex = 0; // index in scenario.turns
+  int turnIndex = 0; 
   RecordState recordState = RecordState.idle;
 
   final List<ChatMessage> history = [];
@@ -114,9 +114,9 @@ class PracticeController extends ChangeNotifier {
     }
   }
 
-  /// Call this from the Start button to begin the conversation exactly once.
+  
   Future<void> startConversationAutoplayOnce() async {
-    // Only speak if first turn is system and we're at start.
+    
     if (turnIndex == 0 && history.isEmpty && isSystemTurn) {
       await _autoPlayIfSystemTurn();
     }

@@ -8,7 +8,7 @@ class DbMeter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // dB from plugins can vary; display as-is and map to a safe bar (0..1)
+
     final v = value.isFinite ? value : 0;
     final normalized = ((v + 60) / 80).clamp(0.0, 1.0);
 

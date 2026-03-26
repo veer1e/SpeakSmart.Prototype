@@ -17,8 +17,8 @@ class ScoringService {
     final spokenAll = tokenizeWords(recognizedText);
     final spoken = spokenAll.where((w) => w.isNotEmpty).toList();
 
-    // Order-based matching:
-    int i = 0; // expected index
+    
+    int i = 0; 
     final usedSpoken = List<bool>.filled(spoken.length, false);
     final expectedScores = <WordScore>[];
 
@@ -32,14 +32,13 @@ class ScoringService {
           break;
         }
       }
-      // The above matches anywhere; we need in-order credit:
-      // Implement true in-order scan:
+      
     }
 
-    // True in-order scan:
+    
     i = 0;
     for (int j = 0; j < spoken.length && i < expected.length; j++) {
-      if (fillerSet.contains(spoken[j])) continue; // fillers do not help matching
+      if (fillerSet.contains(spoken[j])) continue; 
       if (spoken[j] == expected[i]) {
         usedSpoken[j] = true;
         i += 1;
@@ -47,7 +46,7 @@ class ScoringService {
     }
     final matchedInOrder = i;
 
-    // Build expected word score list
+    
     for (int k = 0; k < expected.length; k++) {
       expectedScores.add(
         WordScore(
@@ -59,7 +58,7 @@ class ScoringService {
       );
     }
 
-    // Count extra words (excluding fillers)
+    
     int extraCount = 0;
     for (int j = 0; j < spoken.length; j++) {
       final w = spoken[j];

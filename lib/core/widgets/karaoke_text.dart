@@ -122,7 +122,7 @@ class _KaraokeTextState extends State<KaraokeText> {
               text: words[i],
               style: widget.style.copyWith(
                 backgroundColor: (i == _index) ? highlightBg : null,
-                // a tiny emphasis for the active word
+
                 fontWeight: (i == _index) ? FontWeight.w700 : widget.style.fontWeight,
               ),
             ),

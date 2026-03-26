@@ -6,8 +6,7 @@ class TtsService {
   final FlutterTts _tts = FlutterTts();
 
   final StorageService? _storage;
-
-  // Defaults chosen to be pleasant and safe; users can adjust in-app.
+  
   double _rate = 0.5;
   double _pitch = 1.0;
 
@@ -17,7 +16,7 @@ class TtsService {
   TtsService({StorageService? storage}) : _storage = storage;
 
   Future<void> init() async {
-    // Load persisted settings (if storage is provided/initialized).
+
     if (_storage != null) {
       _rate = _storage.getTtsRate(fallback: _rate);
       _pitch = _storage.getTtsPitch(fallback: _pitch);

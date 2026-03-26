@@ -2,9 +2,9 @@ import 'fluency_metrics.dart';
 
 class WordScore {
   final String word;
-  final bool expected; // true if part of expected list
-  final bool credited; // matched in correct order
-  final bool extra; // spoken but not used
+  final bool expected; 
+  final bool credited; 
+  final bool extra; 
 
   const WordScore({
     required this.word,
@@ -18,8 +18,8 @@ class ScoreBreakdown {
   final int expectedCount;
   final int matchedInOrder;
   final int extraCount;
-  final double wordAccuracy; // 0..1
-  final int smartSpeakScore; // 0..100
+  final double wordAccuracy; 
+  final int smartSpeakScore; 
   final List<WordScore> expectedWordScores;
   final List<String> spokenWords;
 

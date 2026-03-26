@@ -16,7 +16,7 @@ class CalibrationData {
   double get noiseOkThresholdDb => ambientDbMean + (ambientDbStd * 1.5) + 3.0;
 
   double get voiceDetectThresholdDb {
-    // A conservative threshold: above ambient + margin, and below typical voice mean.
+
     final floor = ambientDbMean + (ambientDbStd * 1.0) + 6.0;
     final ceiling = voiceDbMean - (voiceDbStd * 0.5);
     if (ceiling.isNaN) return floor;

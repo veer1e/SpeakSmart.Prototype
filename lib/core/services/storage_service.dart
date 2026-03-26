@@ -30,12 +30,10 @@ class StorageService {
 
   // ---------- TTS settings ----------
   double getTtsRate({double fallback = 0.5}) {
-    // FlutterTts rate is typically 0.0 - 1.0 (platform-dependent).
     return prefs.getDouble(_kTtsRate) ?? fallback;
   }
 
   double getTtsPitch({double fallback = 1.0}) {
-    // FlutterTts pitch is typically ~0.5 - 2.0 (platform-dependent).
     return prefs.getDouble(_kTtsPitch) ?? fallback;
   }
 
