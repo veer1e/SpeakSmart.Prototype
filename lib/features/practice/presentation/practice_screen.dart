@@ -118,19 +118,6 @@ class _PracticeScreenState extends State<PracticeScreen> {
             },
             icon: const Icon(Icons.refresh),
           ),
-          IconButton(
-            tooltip: 'Menu',
-            icon: const Icon(Icons.menu),
-            onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                useSafeArea: true,
-                isScrollControlled: true,
-                showDragHandle: true,
-                builder: (_) => const _PracticeMenuSheet(),
-              );
-            },
-          ),
         ],
       ),
       body: SafeArea(

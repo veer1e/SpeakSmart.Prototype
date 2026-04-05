@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 ThemeData buildTheme() {
   final base = ThemeData(
@@ -7,6 +8,8 @@ ThemeData buildTheme() {
   );
 
   return base.copyWith(
+    textTheme: GoogleFonts.fredokaTextTheme(base.textTheme),
+    primaryTextTheme: GoogleFonts.fredokaTextTheme(base.primaryTextTheme),
     visualDensity: VisualDensity.standard,
     cardTheme: const CardThemeData(
       elevation: 0,

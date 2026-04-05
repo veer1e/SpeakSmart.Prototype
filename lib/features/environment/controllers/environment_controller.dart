@@ -18,7 +18,7 @@ class EnvironmentController extends ChangeNotifier {
   EnvironmentState state = EnvironmentState.unknown;
   double latestMeanDb = 0;
 
-  // Simple local progress tracking
+
   int streakDays = 1;
   int practicesToday = 0;
   int totalPractices = 0;
@@ -27,6 +27,10 @@ class EnvironmentController extends ChangeNotifier {
   EnvironmentController({required this.storage, required this.audio});
 
   CalibrationData? get calibration => storage.loadCalibration();
+
+  
+  double get wordAccuracy => 0.45;
+  double get fluencyScore => 0.28;
 
   Future<void> start() async {
     await audio.start();

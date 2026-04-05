@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../features/login/loading_screen.dart';
+import '../features/login/login_screen.dart';
 import 'routes.dart';
 import 'theme.dart';
 
@@ -12,7 +14,9 @@ class SmartSpeakApp extends StatelessWidget {
       title: 'SpeakSmart',
       debugShowCheckedModeBanner: false,
       theme: buildTheme(),
-      initialRoute: Routes.shell,
+      home: LoadingScreen(
+        nextPageBuilder: (_) => const LoginScreen(),
+      ),
       onGenerateRoute: Routes.onGenerateRoute,
     );
   }
