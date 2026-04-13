@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
 import 'app/app.dart';
 import 'features/calibration/controllers/calibration_controller.dart';
 import 'features/environment/controllers/environment_controller.dart';
@@ -9,6 +8,8 @@ import 'core/services/storage_service.dart';
 import 'core/services/stt_service.dart';
 import 'core/services/tts_service.dart';
 import 'core/services/audio_level_service.dart';
+import 'features/login/auth_service.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +26,9 @@ void main() async {
   final audio = AudioLevelService();
   await audio.init();
 
+  final auth = AuthService();
+     await auth.init();
+
   runApp(
     MultiProvider(
       providers: [
@@ -32,6 +36,7 @@ void main() async {
         Provider.value(value: tts),
         Provider.value(value: stt),
         Provider.value(value: audio),
+        Provider.value(value: auth),
 
         ChangeNotifierProvider(
           create: (_) => CalibrationController(storage: storage, audio: audio)..load(),

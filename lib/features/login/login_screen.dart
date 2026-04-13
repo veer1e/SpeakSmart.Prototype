@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import 'auth_service.dart';
 import 'loading_screen.dart';
 import 'signup_screen.dart';
 import '../shell/presentation/shell_screen.dart';
 
-// ─── Palette ───────────────────────────────────────────────────────────────────
+
 class _P {
   static const bgTop     = Color(0xFFCDE8F5);
   static const bgBottom  = Color(0xFFADD8EC);
@@ -24,8 +27,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-
-  // ── Focus nodes for tab-key / next-field navigation ──────────────────────
   final _usernameFocus = FocusNode();
   final _passwordFocus = FocusNode();
 
@@ -41,37 +42,38 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _onSignIn() {
+  Future<void> _onSignIn() async {
     final username = _usernameCtrl.text.trim();
     final password = _passwordCtrl.text.trim();
 
     if (username.isEmpty || password.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please fill in all fields.'),
-          backgroundColor: _P.navy,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      _showSnackbar('Please fill in all fields.');
       return;
     }
 
-    
     setState(() => _isLoading = true);
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => LoadingScreen(
-            nextPageBuilder: (_) => const ShellScreen(),
-            delay: const Duration(milliseconds: 1200),
-          ),
+    final auth   = context.read<AuthService>();
+    final result = await auth.login(username: username, password: password);
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (!result.isSuccess) {
+      // Show the specific error from AuthService (wrong password, no account, etc.)
+      _showSnackbar(result.errorMessage ?? 'Login failed.');
+      return;
+    }
+
+
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => LoadingScreen(
+          nextPageBuilder: (_) => const ShellScreen(),
+          delay: const Duration(milliseconds: 1200),
         ),
-      );
-    });
+      ),
+    );
   }
 
   void _goToSignUp() {
@@ -81,6 +83,17 @@ class _LoginScreenState extends State<LoginScreen> {
         transitionsBuilder: (_, anim, __, child) =>
             FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 350),
+      ),
+    );
+  }
+
+  void _showSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content:         Text(message),
+        backgroundColor: _P.navy,
+        behavior:        SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -106,58 +119,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // App name
-                    Text(
-                      'SpeakSmart',
-                      style: TextStyle(
-                        fontSize:      20,
-                        fontWeight:    FontWeight.w900,
-                        color:         _P.navy,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
 
-                    // Welcome text
+
                     Center(
                       child: Column(
                         children: [
-                          Text(
-                            'Welcome to',
-                            style: TextStyle(
-                              fontSize:   22,
-                              fontWeight: FontWeight.w600,
-                              color:      _P.navy,
-                            ),
-                          ),
-                          Text(
-                            'SpeakSmart!',
-                            style: TextStyle(
-                              fontSize:      28,
-                              fontWeight:    FontWeight.w900,
-                              color:         _P.navy,
-                              letterSpacing: -0.5,
-                            ),
-                          ),
+                          Text('Welcome to',
+                              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: _P.navy)),
+                          Text('SpeakSmart!',
+                              style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: _P.navy, letterSpacing: -0.5)),
                         ],
                       ),
                     ),
                     const SizedBox(height: 28),
 
-                    // Glass card
                     _GlassCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Center(
-                            child: Text(
-                              'Sign-in',
-                              style: TextStyle(
-                                fontSize:   22,
-                                fontWeight: FontWeight.w800,
-                                color:      _P.navy,
-                              ),
-                            ),
+                            child: Text('Sign-in',
+                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _P.navy)),
                           ),
                           const SizedBox(height: 24),
 
@@ -168,8 +150,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             hint:            'Enter your username',
                             focusNode:       _usernameFocus,
                             textInputAction: TextInputAction.next,
-                            onSubmitted:     (_) => FocusScope.of(context)
-                                .requestFocus(_passwordFocus),
+                            onSubmitted:     (_) =>
+                                FocusScope.of(context).requestFocus(_passwordFocus),
                           ),
                           const SizedBox(height: 16),
 
@@ -187,8 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 _obscurePassword
                                     ? Icons.visibility_off_outlined
                                     : Icons.visibility_outlined,
-                                color: _P.textMuted,
-                                size:  20,
+                                color: _P.textMuted, size: 20,
                               ),
                               onPressed: () =>
                                   setState(() => _obscurePassword = !_obscurePassword),
@@ -196,11 +177,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 28),
 
-                          
                           Center(
                             child: SizedBox(
-                              width:  200,
-                              height: 48,
+                              width: 200, height: 48,
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _P.navy,
@@ -208,27 +187,20 @@ class _LoginScreenState extends State<LoginScreen> {
                                   elevation:   4,
                                   shadowColor: _P.navy.withOpacity(0.4),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(32),
-                                  ),
+                                      borderRadius: BorderRadius.circular(32)),
                                 ),
                                 onPressed: _isLoading ? null : _onSignIn,
                                 child: _isLoading
                                     ? const SizedBox(
-                                        width:  22,
-                                        height: 22,
-                                        child:  CircularProgressIndicator(
-                                          strokeWidth: 2.5,
-                                          color:       Colors.white,
-                                        ),
+                                        width: 22, height: 22,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2.5, color: Colors.white),
                                       )
-                                    : const Text(
-                                        'SIGN-IN',
+                                    : const Text('SIGN-IN',
                                         style: TextStyle(
-                                          fontSize:      15,
-                                          fontWeight:    FontWeight.w800,
-                                          letterSpacing: 1.2,
-                                        ),
-                                      ),
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 1.2)),
                               ),
                             ),
                           ),
@@ -237,7 +209,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 28),
 
-                    // Sign-up link
                     Center(
                       child: GestureDetector(
                         onTap: _goToSignUp,
@@ -271,6 +242,7 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 
+
 class _GlassCard extends StatelessWidget {
   final Widget child;
   const _GlassCard({required this.child});
@@ -284,11 +256,7 @@ class _GlassCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         border:       Border.all(color: _P.cardBorder, width: 1.5),
         boxShadow: [
-          BoxShadow(
-            color:      Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            offset:     const Offset(0, 4),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4)),
         ],
       ),
       child: child,
@@ -302,14 +270,8 @@ class _FieldLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize:   13,
-        fontWeight: FontWeight.w600,
-        color:      _P.textDark,
-      ),
-    );
+    return Text(text,
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _P.textDark));
   }
 }
 
@@ -340,7 +302,7 @@ class _AuthField extends StatelessWidget {
       obscureText:     obscure,
       textInputAction: textInputAction,
       onSubmitted:     onSubmitted,
-      style:           TextStyle(color: _P.textDark, fontSize: 14),
+      style: TextStyle(color: _P.textDark, fontSize: 14),
       decoration: InputDecoration(
         hintText:   hint,
         hintStyle:  TextStyle(color: _P.textMuted, fontSize: 13),
@@ -349,17 +311,13 @@ class _AuthField extends StatelessWidget {
         fillColor:  Colors.white.withOpacity(0.88),
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:   BorderSide.none,
-        ),
+            borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:   BorderSide(color: Colors.white.withOpacity(0.6), width: 1.2),
-        ),
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.6), width: 1.2)),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:   BorderSide(color: _P.navy, width: 1.5),
-        ),
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _P.navy, width: 1.5)),
       ),
     );
   }
@@ -371,14 +329,12 @@ class _BlobDecoration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    return Stack(
-      children: [
-        Positioned(top: -60,  right: -40, child: _blob(160, _P.navy.withOpacity(0.18))),
-        Positioned(top: size.height * 0.25, left: -50, child: _blob(130, _P.navy.withOpacity(0.12))),
-        Positioned(bottom: size.height * 0.1, right: -30, child: _blob(100, _P.navy.withOpacity(0.10))),
-        Positioned(bottom: -40, left: size.width * 0.2, child: _blob(140, _P.navy.withOpacity(0.15))),
-      ],
-    );
+    return Stack(children: [
+      Positioned(top: -60,  right: -40, child: _blob(160, _P.navy.withOpacity(0.18))),
+      Positioned(top: size.height * 0.25, left: -50, child: _blob(130, _P.navy.withOpacity(0.12))),
+      Positioned(bottom: size.height * 0.1, right: -30, child: _blob(100, _P.navy.withOpacity(0.10))),
+      Positioned(bottom: -40, left: size.width * 0.2, child: _blob(140, _P.navy.withOpacity(0.15))),
+    ]);
   }
 
   Widget _blob(double size, Color color) => Container(

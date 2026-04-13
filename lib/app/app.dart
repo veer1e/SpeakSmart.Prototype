@@ -16,6 +16,7 @@ class SmartSpeakApp extends StatelessWidget {
       theme: buildTheme(),
       home: LoadingScreen(
         nextPageBuilder: (_) => const LoginScreen(),
+        delay: const Duration(seconds: 2),
       ),
       onGenerateRoute: Routes.onGenerateRoute,
     );

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import 'auth_service.dart';
 import 'login_screen.dart';
 
 class _P {
@@ -25,7 +28,6 @@ class _SignupScreenState extends State<SignupScreen> {
   final _passwordCtrl       = TextEditingController();
   final _verifyPasswordCtrl = TextEditingController();
 
-  
   final _firstNameFocus      = FocusNode();
   final _lastNameFocus       = FocusNode();
   final _usernameFocus       = FocusNode();
@@ -51,13 +53,14 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  void _onSignUp() {
+  Future<void> _onSignUp() async {
     final firstName      = _firstNameCtrl.text.trim();
     final lastName       = _lastNameCtrl.text.trim();
     final username       = _usernameCtrl.text.trim();
     final password       = _passwordCtrl.text.trim();
     final verifyPassword = _verifyPasswordCtrl.text.trim();
 
+    // ── Client-side checks before hitting AuthService ──────────────────────
     if (firstName.isEmpty || lastName.isEmpty || username.isEmpty ||
         password.isEmpty || verifyPassword.isEmpty) {
       _showSnackbar('Please fill in all fields.');
@@ -72,22 +75,38 @@ class _SignupScreenState extends State<SignupScreen> {
       return;
     }
 
-    
     setState(() => _isLoading = true);
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
 
-      
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder:        (_, __, ___) => const LoginScreen(),
-          transitionsBuilder: (_, anim, __, child) =>
-              FadeTransition(opacity: anim, child: child),
-          transitionDuration: const Duration(milliseconds: 400),
-        ),
-      );
-    });
+
+    final auth   = context.read<AuthService>();
+    final result = await auth.register(
+      firstName: firstName,
+      lastName:  lastName,
+      username:  username,
+      password:  password,
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (!result.isSuccess) {
+      _showSnackbar(result.errorMessage ?? 'Registration failed.');
+      return;
+    }
+
+
+    _showSnackbar('Account created! Please sign in.');
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder:        (_, __, ___) => const LoginScreen(),
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 400),
+      ),
+    );
   }
 
   void _showSnackbar(String message) {
@@ -127,10 +146,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     Text(
                       'SpeakSmart',
                       style: TextStyle(
-                        fontSize:      20,
-                        fontWeight:    FontWeight.w900,
-                        color:         _P.navy,
-                        letterSpacing: -0.5,
+                        fontSize: 20, fontWeight: FontWeight.w900,
+                        color: _P.navy, letterSpacing: -0.5,
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -140,14 +157,8 @@ class _SignupScreenState extends State<SignupScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Center(
-                            child: Text(
-                              'Sign-up',
-                              style: TextStyle(
-                                fontSize:   22,
-                                fontWeight: FontWeight.w800,
-                                color:      _P.navy,
-                              ),
-                            ),
+                            child: Text('Sign-up',
+                                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _P.navy)),
                           ),
                           const SizedBox(height: 20),
 
@@ -158,8 +169,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             hint:            'Enter your first name',
                             focusNode:       _firstNameFocus,
                             textInputAction: TextInputAction.next,
-                            onSubmitted:     (_) => FocusScope.of(context)
-                                .requestFocus(_lastNameFocus),
+                            onSubmitted:     (_) =>
+                                FocusScope.of(context).requestFocus(_lastNameFocus),
                           ),
                           const SizedBox(height: 14),
 
@@ -170,8 +181,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             hint:            'Enter your last name',
                             focusNode:       _lastNameFocus,
                             textInputAction: TextInputAction.next,
-                            onSubmitted:     (_) => FocusScope.of(context)
-                                .requestFocus(_usernameFocus),
+                            onSubmitted:     (_) =>
+                                FocusScope.of(context).requestFocus(_usernameFocus),
                           ),
                           const SizedBox(height: 14),
 
@@ -182,8 +193,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             hint:            'Choose a username',
                             focusNode:       _usernameFocus,
                             textInputAction: TextInputAction.next,
-                            onSubmitted:     (_) => FocusScope.of(context)
-                                .requestFocus(_passwordFocus),
+                            onSubmitted:     (_) =>
+                                FocusScope.of(context).requestFocus(_passwordFocus),
                           ),
                           const SizedBox(height: 14),
 
@@ -195,15 +206,14 @@ class _SignupScreenState extends State<SignupScreen> {
                             focusNode:       _passwordFocus,
                             obscure:         _obscurePassword,
                             textInputAction: TextInputAction.next,
-                            onSubmitted:     (_) => FocusScope.of(context)
-                                .requestFocus(_verifyPasswordFocus),
+                            onSubmitted:     (_) =>
+                                FocusScope.of(context).requestFocus(_verifyPasswordFocus),
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscurePassword
                                     ? Icons.visibility_off_outlined
                                     : Icons.visibility_outlined,
-                                color: _P.textMuted,
-                                size:  20,
+                                color: _P.textMuted, size: 20,
                               ),
                               onPressed: () =>
                                   setState(() => _obscurePassword = !_obscurePassword),
@@ -219,14 +229,13 @@ class _SignupScreenState extends State<SignupScreen> {
                             focusNode:       _verifyPasswordFocus,
                             obscure:         _obscureVerifyPassword,
                             textInputAction: TextInputAction.done,
-                           onSubmitted:     (_) => _onSignUp(),
+                            onSubmitted:     (_) => _onSignUp(),
                             suffixIcon: IconButton(
                               icon: Icon(
                                 _obscureVerifyPassword
                                     ? Icons.visibility_off_outlined
                                     : Icons.visibility_outlined,
-                                color: _P.textMuted,
-                                size:  20,
+                                color: _P.textMuted, size: 20,
                               ),
                               onPressed: () => setState(
                                   () => _obscureVerifyPassword = !_obscureVerifyPassword),
@@ -234,11 +243,9 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                           const SizedBox(height: 28),
 
-                          
                           Center(
                             child: SizedBox(
-                              width:  200,
-                              height: 48,
+                              width: 200, height: 48,
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _P.navy,
@@ -246,27 +253,20 @@ class _SignupScreenState extends State<SignupScreen> {
                                   elevation:   4,
                                   shadowColor: _P.navy.withOpacity(0.4),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(32),
-                                  ),
+                                      borderRadius: BorderRadius.circular(32)),
                                 ),
                                 onPressed: _isLoading ? null : _onSignUp,
                                 child: _isLoading
                                     ? const SizedBox(
-                                        width:  22,
-                                        height: 22,
-                                        child:  CircularProgressIndicator(
-                                          strokeWidth: 2.5,
-                                          color:       Colors.white,
-                                        ),
+                                        width: 22, height: 22,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2.5, color: Colors.white),
                                       )
-                                    : const Text(
-                                        'SIGN-UP',
+                                    : const Text('SIGN-UP',
                                         style: TextStyle(
-                                          fontSize:      15,
-                                          fontWeight:    FontWeight.w800,
-                                          letterSpacing: 1.2,
-                                        ),
-                                      ),
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 1.2)),
                               ),
                             ),
                           ),
@@ -274,7 +274,6 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-
 
                     Center(
                       child: GestureDetector(
@@ -308,7 +307,7 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 }
 
-
+// ─── Shared widgets ────────────────────────────────────────────────────────────
 
 class _GlassCard extends StatelessWidget {
   final Widget child;
@@ -323,11 +322,7 @@ class _GlassCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         border:       Border.all(color: _P.cardBorder, width: 1.5),
         boxShadow: [
-          BoxShadow(
-            color:      Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            offset:     const Offset(0, 4),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4)),
         ],
       ),
       child: child,
@@ -341,14 +336,8 @@ class _FieldLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize:   13,
-        fontWeight: FontWeight.w600,
-        color:      _P.textDark,
-      ),
-    );
+    return Text(text,
+        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _P.textDark));
   }
 }
 
@@ -379,7 +368,7 @@ class _AuthField extends StatelessWidget {
       obscureText:     obscure,
       textInputAction: textInputAction,
       onSubmitted:     onSubmitted,
-      style:           TextStyle(color: _P.textDark, fontSize: 14),
+      style: TextStyle(color: _P.textDark, fontSize: 14),
       decoration: InputDecoration(
         hintText:   hint,
         hintStyle:  TextStyle(color: _P.textMuted, fontSize: 13),
@@ -388,17 +377,13 @@ class _AuthField extends StatelessWidget {
         fillColor:  Colors.white.withOpacity(0.88),
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:   BorderSide.none,
-        ),
+            borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:   BorderSide(color: Colors.white.withOpacity(0.6), width: 1.2),
-        ),
+            borderRadius: BorderRadius.circular(14),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.6), width: 1.2)),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide:   BorderSide(color: _P.navy, width: 1.5),
-        ),
+            borderRadius: BorderRadius.circular(14),
+            borderSide: const BorderSide(color: _P.navy, width: 1.5)),
       ),
     );
   }
@@ -410,14 +395,12 @@ class _BlobDecoration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    return Stack(
-      children: [
-        Positioned(top: -60,  right: -40, child: _blob(160, _P.navy.withOpacity(0.18))),
-        Positioned(top: size.height * 0.25, left: -50, child: _blob(130, _P.navy.withOpacity(0.12))),
-        Positioned(bottom: size.height * 0.1, right: -30, child: _blob(100, _P.navy.withOpacity(0.10))),
-        Positioned(bottom: -40, left: size.width * 0.2, child: _blob(140, _P.navy.withOpacity(0.15))),
-      ],
-    );
+    return Stack(children: [
+      Positioned(top: -60,  right: -40, child: _blob(160, _P.navy.withOpacity(0.18))),
+      Positioned(top: size.height * 0.25, left: -50, child: _blob(130, _P.navy.withOpacity(0.12))),
+      Positioned(bottom: size.height * 0.1, right: -30, child: _blob(100, _P.navy.withOpacity(0.10))),
+      Positioned(bottom: -40, left: size.width * 0.2, child: _blob(140, _P.navy.withOpacity(0.15))),
+    ]);
   }
 
   Widget _blob(double size, Color color) => Container(
