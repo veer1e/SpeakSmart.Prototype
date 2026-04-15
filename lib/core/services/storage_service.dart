@@ -62,4 +62,13 @@ class StorageService {
       updatedAtMs: prefs.getInt('calibrationUpdatedAtMs') ?? DateTime.now().millisecondsSinceEpoch,
     );
   }
+
+  // Debug: Clear all calibration data
+  Future<void> clearCalibration() async {
+    await prefs.remove('ambientDbMean');
+    await prefs.remove('ambientDbStd');
+    await prefs.remove('voiceDbMean');
+    await prefs.remove('voiceDbStd');
+    await prefs.remove('calibrationUpdatedAtMs');
+  }
 }
