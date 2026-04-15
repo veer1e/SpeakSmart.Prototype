@@ -17,36 +17,39 @@ class ScoringService {
     final spokenAll = tokenizeWords(recognizedText);
     final spoken = spokenAll.where((w) => w.isNotEmpty).toList();
 
-    
+    // First pass: exact/similar word matching
     int i = 0; 
     final usedSpoken = List<bool>.filled(spoken.length, false);
     final expectedScores = <WordScore>[];
 
     for (final exp in expected) {
       bool matched = false;
+      // Try to find a similar word in spoken words
       for (int j = 0; j < spoken.length; j++) {
         if (usedSpoken[j]) continue;
-        if (spoken[j] == exp) {
+        // Use similarity matching instead of exact matching
+        if (areWordsSimilar(spoken[j], exp)) {
           usedSpoken[j] = true;
           matched = true;
           break;
         }
       }
-      
+      // Note: we're not storing matched here, we'll do that after checking order
     }
 
-    
+    // Second pass: check order of matching words
     i = 0;
     for (int j = 0; j < spoken.length && i < expected.length; j++) {
       if (fillerSet.contains(spoken[j])) continue; 
-      if (spoken[j] == expected[i]) {
+      // Use similarity matching instead of exact matching
+      if (areWordsSimilar(spoken[j], expected[i])) {
         usedSpoken[j] = true;
         i += 1;
       }
     }
     final matchedInOrder = i;
 
-    
+    // Build expected word scores
     for (int k = 0; k < expected.length; k++) {
       expectedScores.add(
         WordScore(
@@ -58,7 +61,7 @@ class ScoringService {
       );
     }
 
-    
+    // Calculate extra words (words that don't match anything expected)
     int extraCount = 0;
     for (int j = 0; j < spoken.length; j++) {
       final w = spoken[j];

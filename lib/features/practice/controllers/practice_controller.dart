@@ -30,7 +30,7 @@ class PracticeController extends ChangeNotifier {
   Difficulty difficulty = Difficulty.easy;
   late ConversationScenario scenario;
 
-  int turnIndex = 0; 
+  int turnIndex = 0;
   RecordState recordState = RecordState.idle;
 
   final List<ChatMessage> history = [];
@@ -44,6 +44,11 @@ class PracticeController extends ChangeNotifier {
   int fillerCount = 0;
 
   StreamSubscription<SttResult>? _sub;
+
+  // Completer that resolves when we receive a final STT result (or the stream
+  // closes without one). This lets stopRecording() wait for Android's async
+  // final-result callback before the UI tries to score.
+  Completer<void>? _finalResultCompleter;
 
   PracticeController({required this.storage, required this.stt, required this.tts}) {
     scenario = conversationScenarios.first;
@@ -114,9 +119,7 @@ class PracticeController extends ChangeNotifier {
     }
   }
 
-  
   Future<void> startConversationAutoplayOnce() async {
-    
     if (turnIndex == 0 && history.isEmpty && isSystemTurn) {
       await _autoPlayIfSystemTurn();
     }
@@ -127,45 +130,151 @@ class PracticeController extends ChangeNotifier {
       throw Exception('Not your turn yet. Listen to the partner first.');
     }
 
+    debugPrint('[PracticeController] startRecording() called');
+    
     final mic = await Permission.microphone.request();
+    debugPrint('[PracticeController] Microphone permission: ${mic.name}');
     if (!mic.isGranted) {
       throw Exception('Microphone permission required');
     }
 
     final ok = await stt.requestAndCheck();
+    debugPrint('[PracticeController] STT available: $ok');
     if (!ok) {
-      throw Exception('Speech-to-text not available on this device');
+      throw Exception(
+        'Speech-to-text not available on this device. '
+        'On an Android emulator make sure a microphone is configured and '
+        'the Google app is installed for on-device speech recognition.',
+      );
     }
+
+    // Cancel any in-flight session before starting a new one.
+    await _cancelCurrentSession();
 
     partialText = '';
     finalText = '';
     recordState = RecordState.listening;
     _resetFluency();
+
+    // Set up completer before subscribing so stopRecording() can await it.
+    _finalResultCompleter = Completer<void>();
+
     notifyListeners();
 
-    _sub?.cancel();
-    _sub = stt.listen().listen((r) {
-      _updateFluency(r);
-      partialText = r.recognizedWords;
-      if (r.isFinal) {
-        finalText = r.recognizedWords;
-        recordState = RecordState.processing;
-        notifyListeners();
-      } else {
-        notifyListeners();
-      }
-    });
+    debugPrint('[PracticeController] Creating STT stream...');
+    _sub = stt.listen().listen(
+      (r) {
+        debugPrint('[PracticeController] Got STT result: "${r.recognizedWords}" (final: ${r.isFinal})');
+        _updateFluency(r);
+        partialText = r.recognizedWords;
+        if (r.isFinal) {
+          finalText = r.recognizedWords;
+          recordState = RecordState.processing;
+          // Signal that we have a final result.
+          if (_finalResultCompleter != null && !_finalResultCompleter!.isCompleted) {
+            _finalResultCompleter!.complete();
+          }
+          notifyListeners();
+        } else {
+          notifyListeners();
+        }
+      },
+      onError: (Object err) {
+        debugPrint('[PracticeController] ❌ STT stream ERROR: $err');
+        _completeIfPending();
+        if (recordState == RecordState.listening) {
+          recordState = RecordState.processing;
+          notifyListeners();
+        }
+      },
+      onDone: () {
+        debugPrint('[PracticeController] ⏹️ STT stream DONE (closed)');
+        // Stream closed (silence timeout, etc.) without a final result.
+        _completeIfPending();
+        if (recordState == RecordState.listening) {
+          recordState = RecordState.processing;
+          notifyListeners();
+        }
+      },
+    );
+    debugPrint('[PracticeController] STT stream subscription created');
   }
 
+  void _completeIfPending() {
+    if (_finalResultCompleter != null && !_finalResultCompleter!.isCompleted) {
+      _finalResultCompleter!.complete();
+    }
+  }
+
+  /// Stop recording and **wait** for Android to deliver the final STT result
+  /// (or time out after 5 s if nothing arrives). This is the key fix for the
+  /// "loads forever / no input received" bug: on Android, the recognizer
+  /// delivers its final result *after* stop() returns, so we must wait.
+  /// 
+  /// IMPORTANT: This also cancels the subscription after the timeout to ensure
+  /// we never get stuck in "processing" state, even if the stream doesn't close.
   Future<void> stopRecording() async {
-    await stt.stop();
-    await _sub?.cancel();
-    _sub = null;
+    debugPrint('[PracticeController] stopRecording() called');
+    
+    try {
+      await stt.stop();
+      debugPrint('[PracticeController] ✅ stt.stop() completed');
+    } catch (e) {
+      debugPrint('[PracticeController] ⚠️ stt.stop() error: $e');
+    }
+
+    // Give Android up to 5 seconds to deliver the final result callback.
+    if (_finalResultCompleter != null && !_finalResultCompleter!.isCompleted) {
+      try {
+        debugPrint('[PracticeController] ⏳ Waiting for final result (max 5s)...');
+        await _finalResultCompleter!.future.timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            debugPrint('[PracticeController] ⏱️ Final-result timeout — using partial text');
+            _completeIfPending();
+            // Fall back to whatever partial text we have.
+            if (partialText.isNotEmpty && finalText.isEmpty) {
+              finalText = partialText;
+              debugPrint('[PracticeController] 📝 Set finalText from partial: "$finalText"');
+            }
+          },
+        );
+        debugPrint('[PracticeController] ✅ Final result completed');
+      } catch (e) {
+        debugPrint('[PracticeController] ⚠️ Error waiting for final result: $e');
+        _completeIfPending();
+      }
+    } else {
+      debugPrint('[PracticeController] ℹ️ No final result completer or already completed');
+    }
+
+    // CRITICAL: Force cancel the subscription to prevent the stream from hanging.
+    // This ensures we transition out of listening/processing state no matter what.
+    if (_sub != null) {
+      try {
+        debugPrint('[PracticeController] 🛑 Cancelling STT subscription');
+        await _sub!.cancel();
+        debugPrint('[PracticeController] ✅ Subscription cancelled');
+      } catch (e) {
+        debugPrint('[PracticeController] ⚠️ Error cancelling subscription: $e');
+      }
+      _sub = null;
+    }
 
     if (recordState == RecordState.listening) {
+      debugPrint('[PracticeController] 🔄 Setting state to processing');
       recordState = RecordState.processing;
       notifyListeners();
     }
+    
+    debugPrint('[PracticeController] ✅ stopRecording() complete');
+  }
+
+  Future<void> _cancelCurrentSession() async {
+    _completeIfPending();
+    await _sub?.cancel();
+    _sub = null;
+    _finalResultCompleter = null;
   }
 
   ScoreResult buildScoreForCurrentUserLine() {
@@ -200,6 +309,16 @@ class PracticeController extends ChangeNotifier {
 
   void resetConversation() {
     _resetConversation();
+    notifyListeners();
+  }
+
+  /// Reset recording state for retry - clears previous attempt data but keeps same line
+  void resetForRetry() {
+    debugPrint('[PracticeController] Resetting for retry - clearing previous recording data');
+    partialText = '';
+    finalText = '';
+    recordState = RecordState.idle;
+    _resetFluency();
     notifyListeners();
   }
 

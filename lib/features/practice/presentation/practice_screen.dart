@@ -9,6 +9,7 @@ import '../../calibration/controllers/calibration_controller.dart';
 import '../../environment/controllers/environment_controller.dart';
 import '../controllers/practice_controller.dart';
 import '../models/conversation_scenario.dart';
+import '../models/score_result.dart';
 import '../../../core/widgets/karaoke_text.dart';
 
 // ─── Palette (same as home/login/shell) ───────────────────────────────────────
@@ -93,8 +94,17 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
   String? _lastScenarioId;
   Difficulty? _lastDifficulty;
+  
+  RecordState _lastRecordState = RecordState.idle;
+  bool _processingAutoFlowInProgress = false;
 
   final ScrollController _sessionScroll = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    debugPrint('[PracticeScreen.initState] Setting up listeners');
+  }
 
   void _scrollToBottom() {
     if (!_sessionScroll.hasClients) return;
@@ -112,6 +122,185 @@ class _PracticeScreenState extends State<PracticeScreen> {
   void dispose() {
     _sessionScroll.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleMicPressed(BuildContext context, PracticeController p) async {
+    if (p.isFinished) return;
+
+    try {
+      if (p.isSystemTurn) {
+        await p.nextTurn();
+        _scrollToBottom();
+        return;
+      }
+
+      if (!p.isUserTurn) {
+        throw Exception('Listen to the partner first.');
+      }
+
+      // Handle two states: listening (user taps to stop) or processing (auto-stop from final result)
+      if (p.recordState == RecordState.listening || p.recordState == RecordState.processing) {
+        // If still actively listening, stop it first
+        if (p.recordState == RecordState.listening) {
+          debugPrint('[PracticeScreen] 🎤 User manually stopped recording (listening→processing)');
+          await p.stopRecording();
+          debugPrint('[PracticeScreen] ✅ Recording stopped');
+        } else {
+          // Already in processing state from auto-final result
+          debugPrint('[PracticeScreen] ℹ️ Recording already stopped (auto-completed), proceeding with post-flow');
+        }
+
+        // Wrap the entire post-recording flow in timeout to prevent permanent hangs
+        debugPrint('[PracticeScreen] 🔄 Starting post-recording flow...');
+        await _postRecordingFlow(context, p).timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            debugPrint('[PracticeScreen] ❌ Post-recording flow timeout (30s) - forcing state reset');
+            p.recordState = RecordState.idle;
+            p.notifyListeners();
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Recording processing timed out. Please try again.'),
+                  backgroundColor: Colors.orange,
+                  duration: Duration(seconds: 5),
+                ),
+              );
+            }
+          },
+        );
+        debugPrint('[PracticeScreen] ✅ Post-recording flow complete');
+      } else {
+        // recordState == RecordState.idle, start new recording
+        debugPrint('[PracticeScreen] 🎤 Starting new recording...');
+        await p.startRecording();
+        debugPrint('[PracticeScreen] ✅ Recording started');
+      }
+    } catch (e) {
+      debugPrint('[PracticeScreen] ❌ Error in _handleMicPressed: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+      // Reset state on error
+      p.recordState = RecordState.idle;
+      p.notifyListeners();
+    }
+  }
+
+  Future<void> _postRecordingFlow(BuildContext context, PracticeController p) async {
+    debugPrint('[PracticeScreen] 🎙️ Starting post-recording flow...');
+    
+    // If recordState is processing but we haven't called stopRecording yet,
+    // this means STT auto-fired a final result. We MUST call stopRecording to
+    // ensure all STT cleanup happens (subscription cancel, etc.)
+    if (p.recordState == RecordState.processing && p.finalText.isEmpty) {
+      debugPrint('[PracticeScreen] ⚠️ Auto-triggered processing but stopRecording not yet called');
+      debugPrint('[PracticeScreen] 🛑 Calling stopRecording now to ensure cleanup...');
+      try {
+        await p.stopRecording();
+        debugPrint('[PracticeScreen] ✅ stopRecording completed');
+      } catch (e) {
+        debugPrint('[PracticeScreen] ⚠️ stopRecording error: $e');
+        // Continue anyway, use partial text
+      }
+    } else if (p.recordState == RecordState.listening) {
+      // This shouldn't happen if auto-trigger works, but handle it just in case
+      debugPrint('[PracticeScreen] ⚠️ Still listening when post-flow started, stopping now...');
+      await p.stopRecording();
+      debugPrint('[PracticeScreen] ✅ Recording stopped');
+    } else {
+      debugPrint('[PracticeScreen] ℹ️ Recording already properly stopped');
+    }
+
+    // Verify we have recognized text before building score
+    if (p.finalText.isEmpty && p.partialText.isEmpty) {
+      debugPrint('[PracticeScreen] ❌ No recognized text available!');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No speech was detected. Please try again.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+      return;
+    }
+
+    debugPrint('[PracticeScreen] 📊 Building score with finalText="${p.finalText}" partialText="${p.partialText}"');
+    late ScoreResult result;
+    try {
+      result = p.buildScoreForCurrentUserLine();
+      debugPrint('[PracticeScreen] ✅ Score built: ${result.breakdown.smartSpeakScore}');
+    } catch (e) {
+      debugPrint('[PracticeScreen] ❌ Error building score: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to build score: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
+      }
+      return;
+    }
+    
+    final score = result.breakdown.smartSpeakScore;
+
+    if (context.mounted) {
+      try {
+        debugPrint('[PracticeScreen] 💾 Recording practice...');
+        context.read<EnvironmentController>().recordPractice(score);
+        debugPrint('[PracticeScreen] ✅ Practice recorded');
+      } catch (e) {
+        debugPrint('[PracticeScreen] ⚠️ Failed to record practice: $e');
+      }
+    }
+
+    // Always show feedback screen (which has retry/continue buttons inside)
+    if (!context.mounted) {
+      debugPrint('[PracticeScreen] ❌ Context unmounted, cannot navigate to feedback');
+      return;
+    }
+
+    debugPrint('[PracticeScreen] 🚀 Navigating to feedback...');
+    final feedbackResult = await Navigator.pushNamed(context, Routes.feedback, arguments: result);
+    debugPrint('[PracticeScreen] ✅ Returned from feedback with result: $feedbackResult');
+
+    // Add a small delay to ensure the feedback route has fully popped before advancing
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    // If user clicked "Try Again" on feedback screen, reset state for retry
+    if (feedbackResult == 'try_again') {
+      debugPrint('[PracticeScreen] 🔄 User clicked "Try Again" in feedback - resetting recording state');
+      p.resetForRetry();
+      return;
+    }
+
+    if (!context.mounted) {
+      debugPrint('[PracticeScreen] ❌ Context unmounted after feedback, cannot advance');
+      return;
+    }
+
+    debugPrint('[PracticeScreen] 📝 Committing user line...');
+    await p.commitUserLineAndAdvance(recognizedText: result.recognizedText);
+    debugPrint('[PracticeScreen] ✅ Line committed');
+
+    _scrollToBottom();
+    
+    debugPrint('[PracticeScreen] 🎤 Resuming system...');
+    await _speakCurrentSystemLineIfAny(p: p, tts: context.read<TtsService>());
+    debugPrint('[PracticeScreen] ✅ System resumed');
+    
+    _scrollToBottom();
+    debugPrint('[PracticeScreen] ✅ Post-recording flow complete');
   }
 
   void _syncPreviewState(PracticeController p) {
@@ -165,6 +354,30 @@ class _PracticeScreenState extends State<PracticeScreen> {
     final tts   = context.read<TtsService>();
 
     _syncPreviewState(p);
+
+    // AUTO-TRIGGER POST-RECORDING FLOW: When STT automatically completes and 
+    // recordState becomes processing, automatically proceed without user tap
+    if (_lastRecordState != p.recordState && p.recordState == RecordState.processing && !_processingAutoFlowInProgress) {
+      _lastRecordState = p.recordState;
+      debugPrint('[PracticeScreen] 🔄 Auto-detected state change to processing, triggering flow...');
+      
+      // Schedule this to run after current frame to prevent nested builds
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _processingAutoFlowInProgress = true;
+        
+        debugPrint('[PracticeScreen] ▶️ Starting auto post-recording flow');
+        _handleMicPressed(context, p).then((_) {
+          _processingAutoFlowInProgress = false;
+          debugPrint('[PracticeScreen] ✅ Auto flow complete');
+        }).catchError((e) {
+          _processingAutoFlowInProgress = false;
+          debugPrint('[PracticeScreen] ❌ Auto flow error: $e');
+        });
+      });
+    } else if (p.recordState != RecordState.processing) {
+      _lastRecordState = p.recordState;
+    }
 
     final isNoisy = (calib.data != null) && (env.latestMeanDb > calib.data!.noiseOkThresholdDb);
 
@@ -318,6 +531,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
                           await _speakCurrentSystemLineIfAny(p: p, tts: tts);
                         },
                         onAfterAdvanceScroll: _scrollToBottom,
+                        onMicPressed: _handleMicPressed,
                       ),
               ),
             ],
@@ -325,6 +539,41 @@ class _PracticeScreenState extends State<PracticeScreen> {
         ),
       ),
     );
+  }
+
+  Future<bool> _showRetryDialog(BuildContext context, int score) async {
+    final result = await showDialog<bool>(
+      context:              context,
+      barrierDismissible:   false,
+      builder: (context) => AlertDialog(
+        backgroundColor: _P.cardWhite,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: const Text(
+          'Almost there 👀',
+          style: TextStyle(fontWeight: FontWeight.w800, color: _P.navy),
+        ),
+        content: Text(
+          'You scored $score.\n\nDo you want to retry this line or continue?',
+          style: const TextStyle(color: _P.textMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Retry', style: TextStyle(color: _P.navy)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _P.navy,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 }
 
@@ -629,12 +878,14 @@ class _RecorderCard extends StatelessWidget {
   final bool isSpeaking;
   final Future<void> Function() onResumeSystemAfterFeedback;
   final VoidCallback onAfterAdvanceScroll;
+  final Future<void> Function(BuildContext context, PracticeController p) onMicPressed;
 
   const _RecorderCard({
     required this.isNoisy,
     required this.isSpeaking,
     required this.onResumeSystemAfterFeedback,
     required this.onAfterAdvanceScroll,
+    required this.onMicPressed,
   });
 
   @override
@@ -681,10 +932,14 @@ class _RecorderCard extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           MicButton(
-            isRecording: p.recordState == RecordState.listening,
+            state: p.recordState == RecordState.listening
+                ? MicButtonState.recording
+                : p.recordState == RecordState.processing
+                    ? MicButtonState.processing
+                    : MicButtonState.idle,
             onPressed: () {
               if (isSpeaking) return;
-              _handleMicPressed(context, p);
+              onMicPressed(context, p);
             },
           ),
           const SizedBox(height: 10),
@@ -707,100 +962,11 @@ class _RecorderCard extends StatelessWidget {
     );
   }
 
-
-  Future<void> _handleMicPressed(BuildContext context, PracticeController p) async {
-    if (p.isFinished) return;
-
-    try {
-      if (p.isSystemTurn) {
-        await p.nextTurn();
-        onAfterAdvanceScroll();
-        return;
-      }
-
-      if (!p.isUserTurn) {
-        throw Exception('Listen to the partner first.');
-      }
-
-      if (p.recordState == RecordState.listening) {
-        await p.stopRecording();
-
-        final result = p.buildScoreForCurrentUserLine();
-        final score  = result.breakdown.smartSpeakScore;
-
-        if (context.mounted) {
-          context.read<EnvironmentController>().recordPractice(score);
-        }
-
-        bool shouldAdvance = true;
-
-        if (score < 100 && context.mounted) {
-          shouldAdvance = await _showRetryDialog(context, score);
-        }
-
-        if (!shouldAdvance) return;
-
-        if (context.mounted) {
-          await Navigator.pushNamed(context, Routes.feedback, arguments: result);
-        }
-
-        await p.commitUserLineAndAdvance(recognizedText: result.recognizedText);
-
-        onAfterAdvanceScroll();
-        await onResumeSystemAfterFeedback();
-        onAfterAdvanceScroll();
-      } else {
-        await p.startRecording();
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Action error: $e')),
-        );
-      }
-    }
-  }
-
   String _bottomHint(PracticeController p) {
     if (p.isFinished) return 'Conversation complete.';
     if (p.isSystemTurn) return 'Partner is speaking. Tap mic to continue to your turn.';
     if (p.recordState == RecordState.listening) return 'Listening… speak your line now.';
     return 'Your turn. Tap the mic and say the prompt exactly.';
-  }
-
-  Future<bool> _showRetryDialog(BuildContext context, int score) async {
-    final result = await showDialog<bool>(
-      context:              context,
-      barrierDismissible:   false,
-      builder: (context) => AlertDialog(
-        backgroundColor: _P.cardWhite,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-        title: const Text(
-          'Almost there 👀',
-          style: TextStyle(fontWeight: FontWeight.w800, color: _P.navy),
-        ),
-        content: Text(
-          'You scored $score.\n\nDo you want to retry this line or continue?',
-          style: const TextStyle(color: _P.textMuted),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Retry', style: TextStyle(color: _P.navy)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _P.navy,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-    );
-    return result ?? false;
   }
 }
 

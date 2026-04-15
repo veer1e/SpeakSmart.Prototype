@@ -116,261 +116,213 @@ class HomeScreen extends StatelessWidget {
           colors: [_P.bgTop, _P.bgBottom],
         ),
       ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 520;
-
-          Widget gap()  => const SizedBox(height: _kGap);
-          Widget hgap() => const SizedBox(width: _kGap);
-
-          
-          final challengeCard = _GlassCard(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color:        _P.labelPill,
-                      borderRadius: BorderRadius.circular(20),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'SpeakSmart',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight:    FontWeight.w900,
+                      color:         _P.textDark,
+                      letterSpacing: -0.5,
                     ),
-                    child: Text(
-                      "Today's Pronunciation Challenge",
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color:      _P.labelText,
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+              ),
+              const SizedBox(height: 4),
 
-                
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+              Text(
+                'Ready to practice today?',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color:      _P.textDark,
+                    ),
+              ),
+              const SizedBox(height: 16),
+
+              const _WeekStrip(),
+              const SizedBox(height: _kGap),
+
+              _GlassCard(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pushNamed(context, Routes.practice),
+                    Align(
+                      alignment: Alignment.centerRight,
                       child: Container(
-                        width: 92, height: 92,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                         decoration: BoxDecoration(
-                          color:  _P.navy,
-                          shape:  BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color:      _P.navy.withOpacity(0.35),
-                              blurRadius: 16,
-                              offset:     const Offset(0, 6),
-                            ),
-                          ],
+                          color:        _P.labelPill,
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        child: const Icon(Icons.mic, color: Colors.white, size: 40),
+                        child: Text(
+                          "Today's Pronunciation Challenge",
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                color:      _P.labelText,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(height: 16),
 
-                    
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: const [
-                          _ChatBubble('"I want to improve\nmy pronunciation."'),
-                          SizedBox(height: 10),
-                          _ChatBubble('"Lets go!"'),
-                        ],
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        GestureDetector(
+                          onTap: () => Navigator.pushNamed(context, Routes.practice),
+                          child: Container(
+                            width: 92, height: 92,
+                            decoration: BoxDecoration(
+                              color:  _P.navy,
+                              shape:  BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color:      _P.navy.withOpacity(0.35),
+                                  blurRadius: 16,
+                                  offset:     const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(Icons.mic, color: Colors.white, size: 40),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: const [
+                              _ChatBubble('"I want to improve\nmy pronunciation."'),
+                              SizedBox(height: 10),
+                              _ChatBubble('"Lets go!"'),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 20),
+                    const SizedBox(height: 20),
 
-                
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _P.green,
-                    foregroundColor: Colors.white,
-                    elevation:   4,
-                    shadowColor: _P.green.withOpacity(0.4),
-                    padding:     const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(32),
-                    ),
-                  ),
-                  onPressed: () => Navigator.pushNamed(context, Routes.practice),
-                  icon:  const Icon(Icons.play_arrow_rounded, size: 26),
-                  label: const Text(
-                    'Start practicing',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                  ),
-                ),
-              ],
-            ),
-          );
-
-          
-          final progressCard = _GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _PillLabel('Progress'),
-                const SizedBox(height: 14),
-                _ProgressBar(
-                  label: 'Word Accuracy',
-                  value: env.wordAccuracy,
-                ),
-                const SizedBox(height: 10),
-                _ProgressBar(
-                  label: 'Fluency',
-                  value: env.fluencyScore,
-                ),
-              ],
-            ),
-          );
-
-          
-          final environmentCard = _GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _PillLabel('Environment'),
-                const SizedBox(height: 10),
-                EnvironmentBadge(state: env.state),
-                const SizedBox(height: 8),
-                Text(
-                  'Live: ${env.latestMeanDb.toStringAsFixed(1)} dB',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color:      _P.textDark,
-                        fontWeight: FontWeight.w500,
-                      ),
-                ),
-              ],
-            ),
-          );
-
-          
-          final calibrationCard = _GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _PillLabel('Calibration'),
-                const SizedBox(height: 6),
-                Text(
-                  calib.hasCalibration
-                      ? 'Calibrated (updated ${calib.updatedAtLabel})'
-                      : 'Not calibrated yet',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: _P.textMuted,
-                      ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: _P.navy,
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _P.green,
                         foregroundColor: Colors.white,
-                        padding:       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        shape:         RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        minimumSize:   Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        textStyle:     const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                        elevation:   4,
+                        shadowColor: _P.green.withOpacity(0.4),
+                        padding:     const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(32),
+                        ),
                       ),
-                      onPressed: () => Navigator.pushNamed(context, Routes.calibration),
-                      icon:  const Icon(Icons.tune, size: 13),
-                      label: Text(calib.hasCalibration ? 'Recalibrate' : 'Calibrate'),
-                    ),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: _P.navy,
-                        side:          const BorderSide(color: _P.navy, width: 1.2),
-                        padding:       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        shape:         RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        minimumSize:   Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        textStyle:     const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      onPressed: () => Navigator.pushNamed(context, Routes.practice),
+                      icon:  const Icon(Icons.play_arrow_rounded, size: 26),
+                      label: const Text(
+                        'Start practicing',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                       ),
-                      onPressed: () => Navigator.pushNamed(context, Routes.environment),
-                      icon:  const Icon(Icons.graphic_eq, size: 13),
-                      label: const Text('Noise Check'),
                     ),
                   ],
                 ),
-              ],
-            ),
-          );
+              ),
+              const SizedBox(height: _kGap),
 
-          
-          final envCalibSection = isNarrow
-              ? Column(children: [environmentCard, gap(), calibrationCard])
-              : Row(
+              _GlassCard(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(child: environmentCard),
-                    hgap(),
-                    Expanded(child: calibrationCard),
-                  ],
-                );
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'SpeakSmart',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            fontWeight:    FontWeight.w900,
-                            color:         _P.textDark,
-                            letterSpacing: -0.5,
-                          ),
+                    _PillLabel('Progress'),
+                    const SizedBox(height: 14),
+                    _ProgressBar(
+                      label: 'Word Accuracy',
+                      value: env.wordAccuracy,
+                    ),
+                    const SizedBox(height: 10),
+                    _ProgressBar(
+                      label: 'Fluency',
+                      value: env.fluencyScore,
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
+              ),
+              const SizedBox(height: _kGap),
 
-                
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              _GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _PillLabel('Environment'),
+                    const SizedBox(height: 10),
+                    EnvironmentBadge(state: env.state),
+                    const SizedBox(height: 8),
                     Text(
-                      'Ready to practice today?',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
+                      'Live: ${env.latestMeanDb.toStringAsFixed(1)} dB',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color:      _P.textDark,
+                            fontWeight: FontWeight.w500,
                           ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+              ),
+              const SizedBox(height: _kGap),
 
-                
-                const _WeekStrip(),
-                gap(),
-
-                
-                challengeCard,
-                gap(),
-
-                
-                progressCard,
-                gap(),
-
-                
-                envCalibSection,
-              ],
-            ),
-          );
-        },
+              _GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _PillLabel('Calibration'),
+                    const SizedBox(height: 6),
+                    Text(
+                      calib.hasCalibration
+                          ? 'Calibrated (updated ${calib.updatedAtLabel})'
+                          : 'Not calibrated yet',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: _P.textMuted,
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: _P.navy,
+                            foregroundColor: Colors.white,
+                            padding:       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            shape:         RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            minimumSize:   Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            textStyle:     const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          onPressed: () => Navigator.pushNamed(context, Routes.calibration),
+                          icon:  const Icon(Icons.tune, size: 13),
+                          label: Text(calib.hasCalibration ? 'Recalibrate' : 'Calibrate'),
+                        ),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _P.navy,
+                            side:          const BorderSide(color: _P.navy, width: 1.2),
+                            padding:       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            shape:         RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            minimumSize:   Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            textStyle:     const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          ),
+                          onPressed: () => Navigator.pushNamed(context, Routes.environment),
+                          icon:  const Icon(Icons.graphic_eq, size: 13),
+                          label: const Text('Noise Check'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -417,7 +369,7 @@ class _ChatBubble extends StatelessWidget {
 
 class _ProgressBar extends StatelessWidget {
   final String label;
-  final double value; // 0.0 – 1.0
+  final double value;
 
   const _ProgressBar({required this.label, required this.value});
 
@@ -452,64 +404,67 @@ class _ProgressBar extends StatelessWidget {
 class _WeekStrip extends StatelessWidget {
   const _WeekStrip();
 
-  static const _labels = ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat'];
+  static const _labels = ['Mon', 'Tue', 'Wed', 'Thur', 'Fri', 'Sat', 'Sun'];
 
   @override
   Widget build(BuildContext context) {
     final today  = DateTime.now();
     final monday = today.subtract(Duration(days: today.weekday - 1));
-    final days   = List.generate(6, (i) => monday.add(Duration(days: i)));
+    final days   = List.generate(7, (i) => monday.add(Duration(days: i)));
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: List.generate(days.length, (i) {
-        final day     = days[i];
-        final isToday = day.day == today.day && day.month == today.month;
-        final isPast  = day.isBefore(DateTime(today.year, today.month, today.day));
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: List.generate(days.length, (i) {
+          final day     = days[i];
+          final isToday = day.day == today.day && day.month == today.month;
+          final isPast  = day.isBefore(DateTime(today.year, today.month, today.day));
 
-        final bg = isToday
-            ? _P.navy
-            : isPast
-                ? _P.navyLight
-                : Colors.white.withOpacity(0.45);
+          final bg = isToday
+              ? _P.navy
+              : isPast
+                  ? _P.navyLight
+                  : Colors.white.withOpacity(0.45);
 
-        final fg = (isToday || isPast) ? Colors.white : _P.textDark;
+          final fg = (isToday || isPast) ? Colors.white : _P.textDark;
 
-        return Expanded(
-          child: Column(
-            children: [
-              Text(
-                _labels[i],
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: _P.textMuted, fontWeight: FontWeight.w500,
-                    ),
-              ),
-              const SizedBox(height: 6),
-              Container(
-                width: 38, height: 38,
-                decoration: BoxDecoration(
-                  color: bg,
-                  shape: BoxShape.circle,
-                  boxShadow: isToday
-                      ? [BoxShadow(
-                          color:      _P.navy.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset:     const Offset(0, 4),
-                        )]
-                      : null,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  '${day.day}',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: fg, fontWeight: FontWeight.w700,
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Column(
+              children: [
+                Text(
+                  _labels[i],
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: _P.textMuted, fontWeight: FontWeight.w500,
                       ),
                 ),
-              ),
-            ],
-          ),
-        );
-      }),
+                const SizedBox(height: 6),
+                Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(
+                    color: bg,
+                    shape: BoxShape.circle,
+                    boxShadow: isToday
+                        ? [BoxShadow(
+                            color:      _P.navy.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset:     const Offset(0, 4),
+                          )]
+                        : null,
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '${day.day}',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: fg, fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ),
     );
   }
 }

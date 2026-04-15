@@ -19,16 +19,17 @@ class ProgressScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final env = context.watch<EnvironmentController>();
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [_P.bgTop, _P.bgBottom],
-          ),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [_P.bgTop, _P.bgBottom],
         ),
-        child: SafeArea(
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(

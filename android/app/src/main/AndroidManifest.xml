@@ -3,9 +3,27 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!--
+        Required on API 33+ (Android 13) for noise_meter / audio_streamer
+        to read the microphone audio stream used for dB-level monitoring.
+    -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <!--
+        On API 31+ the Bluetooth audio stack requires these permissions
+        for the TTS engine to route to Bluetooth headsets correctly.
+    -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
+        android:maxSdkVersion="30" />
+
     <queries>
+        <!-- Allow the app to discover available speech recognition services -->
         <intent>
             <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <!-- Allow the app to query available TTS engines -->
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
     </queries>
 

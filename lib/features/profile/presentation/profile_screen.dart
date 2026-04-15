@@ -26,16 +26,17 @@ class ProfileScreen extends StatelessWidget {
     final user = auth.currentUser;
     final canPop = Navigator.of(context).canPop();
 
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [_P.bgTop, _P.bgBottom],
-          ),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [_P.bgTop, _P.bgBottom],
         ),
-        child: SafeArea(
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(

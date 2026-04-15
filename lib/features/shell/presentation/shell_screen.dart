@@ -35,12 +35,22 @@ class _ShellScreenState extends State<ShellScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(bottom: false, child: _pages[_index]),
-      bottomNavigationBar: _PillNavBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: _destinations,
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFCDE8F5), Color(0xFFADD8EC)],
+        ),
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(bottom: false, child: _pages[_index]),
+        bottomNavigationBar: _PillNavBar(
+          selectedIndex: _index,
+          onDestinationSelected: (i) => setState(() => _index = i),
+          destinations: _destinations,
+        ),
       ),
     );
   }
