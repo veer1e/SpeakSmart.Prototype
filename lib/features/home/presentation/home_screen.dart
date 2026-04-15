@@ -144,6 +144,38 @@ class HomeScreen extends StatelessWidget {
               const _WeekStrip(),
               const SizedBox(height: _kGap),
 
+              if (!calib.hasCalibration) ...[
+                _GlassCard(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _PillLabel('Calibration required'),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Before you begin practicing, calibrate your microphone so SpeakSmart can measure your voice and environment accurately.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: _P.textDark,
+                            ),
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _P.navy,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                        ),
+                        onPressed: () => Navigator.pushNamed(context, Routes.calibration),
+                        icon: const Icon(Icons.tune, size: 18),
+                        label: const Text('Calibrate now', style: TextStyle(fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: _kGap),
+              ],
+
               _GlassCard(
                 padding: const EdgeInsets.all(18),
                 child: Column(
@@ -268,58 +300,57 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: _kGap),
 
-              _GlassCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _PillLabel('Calibration'),
-                    const SizedBox(height: 6),
-                    Text(
-                      calib.hasCalibration
-                          ? 'Calibrated (updated ${calib.updatedAtLabel})'
-                          : 'Not calibrated yet',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: _P.textMuted,
+              if (calib.hasCalibration)
+                _GlassCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _PillLabel('Calibration'),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Calibrated (updated ${calib.updatedAtLabel})',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: _P.textMuted,
+                            ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.icon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _P.navy,
+                              foregroundColor: Colors.white,
+                              padding:       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              shape:         RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              minimumSize:   Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              textStyle:     const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                            onPressed: () => Navigator.pushNamed(context, Routes.calibration),
+                            icon:  const Icon(Icons.tune, size: 13),
+                            label: const Text('Recalibrate'),
                           ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        FilledButton.icon(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: _P.navy,
-                            foregroundColor: Colors.white,
-                            padding:       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            shape:         RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            minimumSize:   Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            textStyle:     const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _P.navy,
+                              side:          const BorderSide(color: _P.navy, width: 1.2),
+                              padding:       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              shape:         RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              minimumSize:   Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              textStyle:     const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                            ),
+                            onPressed: () => Navigator.pushNamed(context, Routes.environment),
+                            icon:  const Icon(Icons.graphic_eq, size: 13),
+                            label: const Text('Noise Check'),
                           ),
-                          onPressed: () => Navigator.pushNamed(context, Routes.calibration),
-                          icon:  const Icon(Icons.tune, size: 13),
-                          label: Text(calib.hasCalibration ? 'Recalibrate' : 'Calibrate'),
-                        ),
-                        OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: _P.navy,
-                            side:          const BorderSide(color: _P.navy, width: 1.2),
-                            padding:       const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                            shape:         RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            minimumSize:   Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            textStyle:     const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                          ),
-                          onPressed: () => Navigator.pushNamed(context, Routes.environment),
-                          icon:  const Icon(Icons.graphic_eq, size: 13),
-                          label: const Text('Noise Check'),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),
