@@ -26,20 +26,6 @@ class FeedbackScreen extends StatefulWidget {
 
 class _FeedbackScreenState extends State<FeedbackScreen> {
   @override
-  void initState() {
-    super.initState();
-    // Auto-close feedback for perfect score after 3 seconds so user can see it
-    if (widget.result.breakdown.smartSpeakScore == 100) {
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) {
-          debugPrint('[FeedbackScreen] Perfect score - auto-closing after 3s');
-          Navigator.pop(context, 'continue');
-        }
-      });
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     final b = widget.result.breakdown;
     
