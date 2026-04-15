@@ -21,12 +21,12 @@ def flutterVersionName = localProperties.getProperty("flutter.versionName")
 if (flutterVersionName == null) flutterVersionName = "1.0"
 
 android {
-    namespace "com.smartspeak.app"
+    namespace "com.speaksmart.app"
     compileSdk 36
     ndkVersion "28.2.13676358"
 
     defaultConfig {
-        applicationId "com.smartspeak.app"
+        applicationId "com.speaksmart.app"
         minSdk 24
         targetSdk 36
 

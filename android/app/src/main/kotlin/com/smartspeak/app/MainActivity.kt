@@ -1,4 +1,4 @@
-package com.smartspeak.app
+package com.speaksmart.app
 
 import io.flutter.embedding.android.FlutterActivity
 
