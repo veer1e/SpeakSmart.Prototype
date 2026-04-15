@@ -123,34 +123,6 @@ class EnvironmentScreen extends StatelessWidget {
                     ),
                   ),
                 const SizedBox(height: 20),
-                _GlassCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Debug Tools',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: _P.navy,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: _P.navy,
-                            side: const BorderSide(color: _P.navy, width: 1),
-                          ),
-                          onPressed: () => Navigator.pushNamed(context, '/debug/stt'),
-                          icon: const Icon(Icons.bug_report_outlined, size: 18),
-                          label: const Text('Test STT Microphone'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),

@@ -9,7 +9,7 @@ import '../features/progress/presentation/progress_screen.dart';
 import '../features/profile/presentation/profile_screen.dart';
 import '../features/practice/models/score_result.dart';
 import '../features/settings/presentation/tts_settings_screen.dart';
-import '../features/settings/presentation/stt_debug_screen.dart';
+
 
 class Routes {
   static const shell = '/';
@@ -39,8 +39,6 @@ class Routes {
       case ttsSettings:
         return MaterialPageRoute(builder: (_) => const TtsSettingsScreen());
       case sttDebug:
-        return MaterialPageRoute(builder: (_) => const SttDebugScreen());
-      case feedback:
         final result = settings.arguments as ScoreResult;
         return MaterialPageRoute(builder: (_) => FeedbackScreen(result: result));
       default:
