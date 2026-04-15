@@ -171,7 +171,7 @@ class CalibrationScreen extends StatelessWidget {
                               borderRadius: BorderRadius.circular(24),
                             ),
                           ),
-                          onPressed: c.sampling
+                          onPressed: (c.sampling || c.step != CalibrationStep.voice)
                               ? null
                               : () async {
                                   try {
