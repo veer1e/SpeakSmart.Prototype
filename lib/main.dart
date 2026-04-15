@@ -16,6 +16,8 @@ void main() async {
 
   final storage = StorageService();
   await storage.init();
+  
+  await storage.clearCalibration();
 
   final tts = TtsService(storage: storage);
   await tts.init();
