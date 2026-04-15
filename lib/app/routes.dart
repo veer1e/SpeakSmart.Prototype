@@ -36,6 +36,9 @@ class Routes {
         return MaterialPageRoute(builder: (_) => const ProgressScreen());
       case profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
+      case feedback:
+        final result = settings.arguments as ScoreResult;
+        return MaterialPageRoute(builder: (_) => FeedbackScreen(result: result));
       case ttsSettings:
         return MaterialPageRoute(builder: (_) => const TtsSettingsScreen());
       case sttDebug:
