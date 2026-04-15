@@ -28,7 +28,7 @@
     </queries>
 
     <application
-        android:label="SmartSpeak"
+        android:label="SpeakSmart"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
